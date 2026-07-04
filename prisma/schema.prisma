@@ -1,0 +1,330 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Core content backbone (Module 1)
+// ---------------------------------------------------------------------------
+
+enum FormatType {
+  BR
+  H2H
+}
+
+enum TournamentStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  
+}
+
+model Game {
+  id         String     @id @default(cuid())
+  slug       String     @unique
+  name       String
+  logoUrl    String?
+  formatType FormatType
+  createdAt  DateTime   @default(now())
+
+  tournaments      Tournament[]
+  teams            Team[]
+  players          Player[]
+  newsPosts        NewsPost[]
+  rankingSnapshots RankingSnapshot[]
+}
+
+model Tournament {
+  id         String           @id @default(cuid())
+  slug       String           @unique
+  name       String
+  gameId     String
+  game       Game             @relation(fields: [gameId], references: [id])
+  tier       String?
+  region     String?
+  startDate  DateTime?
+  endDate    DateTime?
+  prizePool  Int?
+  organizer  String?
+  sourceLink String
+  status     TournamentStatus @default(UPCOMING)
+  createdAt  DateTime         @default(now())
+
+  stages             Stage[]
+  participants       TournamentTeam[]
+  pointsSystem       PointsSystem?
+  brStandingsColumn  BRStandingsColumn?
+  brMatches          BRMatch[]
+  h2hMatches         H2HMatch[]
+  groupStandingsRows GroupStandingsRow[]
+}
+
+// Join table: which teams are participating in a tournament (independent of
+// match results, needed before any matches are played).
+model TournamentTeam {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id])
+  groupName    String?
+
+  @@unique([tournamentId, teamId])
+}
+
+model Stage {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  name         String
+  order        Int        @default(0)
+
+  brMatches  BRMatch[]
+  h2hMatches H2HMatch[]
+}
+
+// ---------------------------------------------------------------------------
+// Module 1a: Dual Match System
+// Battle Royale and Head-to-Head games use genuinely different shapes.
+// Never merge these into one shared table with optional fields.
+// ---------------------------------------------------------------------------
+
+// Per-TOURNAMENT, not per-game — orgs change point formats between events.
+model PointsSystem {
+  id                  String     @id @default(cuid())
+  tournamentId        String     @unique
+  tournament          Tournament @relation(fields: [tournamentId], references: [id])
+  placementPointsJson Json
+  pointsPerKill       Int
+  bonusRulesJson      Json?
+}
+
+model BRMatch {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  stageId      String
+  stage        Stage      @relation(fields: [stageId], references: [id])
+  matchNumber  Int
+  // e.g. "Erangel", "Miramar", "Rondo" — the competitive map pool rotates
+  // per game, kept as a plain string like H2HMatch's MapScore.mapName.
+  mapName      String
+  scheduledAt  DateTime?
+
+  entries BRMatchEntry[]
+}
+
+model BRMatchEntry {
+  id           String  @id @default(cuid())
+  brMatchId    String
+  brMatch      BRMatch @relation(fields: [brMatchId], references: [id])
+  teamId       String
+  team         Team    @relation(fields: [teamId], references: [id])
+  placement    Int
+  kills        Int
+  // Computed from PointsSystem at entry time, then STORED — don't recompute
+  // live, editing the points system later shouldn't shift past totals.
+  pointsEarned Int
+
+  @@unique([brMatchId, teamId])
+}
+
+// Toggleable display config per tournament.
+model BRStandingsColumn {
+  id                String     @id @default(cuid())
+  tournamentId      String     @unique
+  tournament        Tournament @relation(fields: [tournamentId], references: [id])
+  showMatchesPlayed Boolean    @default(true)
+  showWwcd          Boolean    @default(true)
+  showBonus         Boolean    @default(false)
+  showPlacementPts  Boolean    @default(true)
+  showKillPts       Boolean    @default(true)
+}
+
+model H2HMatch {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  stageId      String
+  stage        Stage      @relation(fields: [stageId], references: [id])
+  teamAId      String
+  teamA        Team       @relation("H2HTeamA", fields: [teamAId], references: [id])
+  teamBId      String
+  teamB        Team       @relation("H2HTeamB", fields: [teamBId], references: [id])
+  // Lives on the match, not the tournament — it changes by stage
+  // (Bo1 groups, Bo3 playoffs, Bo5 finals).
+  bestOf       Int
+  scheduledAt  DateTime?
+
+  mapScores MapScore[]
+}
+
+model MapScore {
+  id           String   @id @default(cuid())
+  h2hMatchId   String
+  h2hMatch     H2HMatch @relation(fields: [h2hMatchId], references: [id])
+  mapName      String
+  scoreA       Int
+  scoreB       Int
+  winnerTeamId String?
+  order        Int
+}
+
+model GroupStandingsRow {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  groupName    String
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id])
+  wins         Int        @default(0)
+  losses       Int        @default(0)
+  // Map wins minus map losses across the group stage (e.g. a 2-0 Bo3 win is +2).
+  mapDiff      Int        @default(0)
+  // Individual round wins minus losses across all maps — real-world tiebreaker
+  // after match record and map diff (see VCL South Asia standings: Rank →
+  // Match W-L → Map W-L → Round Diff, no points column at all).
+  roundDiff    Int        @default(0)
+  // Not every H2H org uses points (VCL doesn't) — kept for orgs that do.
+  points       Int        @default(0)
+
+  @@unique([tournamentId, groupName, teamId])
+}
+
+// ---------------------------------------------------------------------------
+// Teams & Players
+// ---------------------------------------------------------------------------
+
+model Team {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id])
+  logoUrl   String?
+  region    String?
+  socials   Json?
+  createdAt DateTime @default(now())
+
+  rosterHistory      RosterHistory[]
+  brMatchEntries     BRMatchEntry[]
+  h2hMatchesAsTeamA  H2HMatch[]          @relation("H2HTeamA")
+  h2hMatchesAsTeamB  H2HMatch[]          @relation("H2HTeamB")
+  groupStandingsRows GroupStandingsRow[]
+  tournamentTeams    TournamentTeam[]
+  rankingSnapshots   RankingSnapshot[]
+}
+
+model Player {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  realName  String?
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id])
+  country   String?
+  socials   Json?
+  createdAt DateTime @default(now())
+
+  rosterHistory    RosterHistory[]
+  rankingSnapshots RankingSnapshot[]
+}
+
+// Past + current team memberships. Team page "current roster" = rows with
+// leftAt null; Player page "past teams" = the full history.
+model RosterHistory {
+  id       String    @id @default(cuid())
+  playerId String
+  player   Player    @relation(fields: [playerId], references: [id])
+  teamId   String
+  team     Team      @relation(fields: [teamId], references: [id])
+  role     String?
+  joinedAt DateTime
+  leftAt   DateTime?
+}
+
+// Manually admin-updated to start (docs: "start manual, automate later").
+model RankingSnapshot {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id])
+  teamId    String?
+  team      Team?    @relation(fields: [teamId], references: [id])
+  playerId  String?
+  player    Player?  @relation(fields: [playerId], references: [id])
+  points    Int
+  rank      Int
+  updatedAt DateTime @updatedAt
+}
+
+model NewsPost {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  body        String
+  gameId      String
+  game        Game      @relation(fields: [gameId], references: [id])
+  author      String
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Module 4: Contributor & Moderation System
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  USER
+  EDITOR
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+
+  revisions Revision[]
+}
+
+enum RevisionEntityType {
+  TOURNAMENT
+  TEAM
+  PLAYER
+  BR_MATCH
+  H2H_MATCH
+  NEWS_POST
+}
+
+enum RevisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Nothing writes directly to live tables from a public-facing form —
+// every submission creates a Revision first.
+model Revision {
+  id         String             @id @default(cuid())
+  entityType RevisionEntityType
+  // Null when the submission proposes creating a brand-new entity.
+  entityId   String?
+  diffJson   Json
+  // Required on every submission (VOD, screenshot, sheet) — enforced here
+  // and in the API route, not just the frontend form.
+  sourceLink String
+  editorId   String
+  editor     User               @relation(fields: [editorId], references: [id])
+  status     RevisionStatus     @default(PENDING)
+  createdAt  DateTime           @default(now())
+  reviewedAt DateTime?
+}
