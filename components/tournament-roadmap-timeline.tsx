@@ -3,7 +3,19 @@
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
-import type { RoadmapTournament } from "@/components/tournament-card";
+
+export type RoadmapTournament = {
+  id: string;
+  slug: string;
+  name: string;
+  tier: string | null;
+  region: string | null;
+  status: "UPCOMING" | "ONGOING" | "COMPLETED";
+  startDate: Date | null;
+  endDate: Date | null;
+  participants: { team: { id: string; name: string; logoUrl: string | null } }[];
+  winner: { id: string; name: string; logoUrl: string | null } | null;
+};
 
 function formatMonthLabel(start: Date | null, end: Date | null) {
   if (!start) return "TBA";
@@ -172,35 +184,36 @@ export function TournamentRoadmapTimeline({
               viewport={{ once: true, margin: "-100px" }}
             >
               {tournaments.map((t) => (
-                <motion.div
-                  key={t.id}
-                  variants={itemVariants}
-                  className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
-                >
-                  <div className="mb-2 flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
-                      <TrophyIcon />
-                    </div>
-                    <span className="text-[0.65rem] font-bold tracking-widest text-cyan-600 uppercase">
-                      {formatMonthLabel(t.startDate, t.endDate)}
-                    </span>
-                    {t.status === "ONGOING" && (
-                      <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-                        LIVE
+                <motion.div key={t.id} variants={itemVariants}>
+                  <Link
+                    href={`/tournament/${t.slug}`}
+                    className="block rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+                  >
+                    <div className="mb-2 flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                        <TrophyIcon />
+                      </div>
+                      <span className="text-[0.65rem] font-bold tracking-widest text-cyan-600 uppercase">
+                        {formatMonthLabel(t.startDate, t.endDate)}
                       </span>
-                    )}
-                  </div>
-                  <h3 className="mb-1 text-base leading-tight font-extrabold tracking-tight text-blue-900">
-                    {t.name}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-zinc-500">
-                    {[t.tier, t.region].filter(Boolean).join(" · ") || "Details TBA"}
-                  </p>
-                  {t.status === "COMPLETED" && t.winner && (
-                    <p className="mt-2 text-xs font-semibold text-amber-700">
-                      🏆 {t.winner.name}
+                      {t.status === "ONGOING" && (
+                        <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                          LIVE
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mb-1 text-base leading-tight font-extrabold tracking-tight text-blue-900">
+                      {t.name}
+                    </h3>
+                    <p className="text-sm leading-relaxed text-zinc-500">
+                      {[t.tier, t.region].filter(Boolean).join(" · ") || "Details TBA"}
                     </p>
-                  )}
+                    {t.status === "COMPLETED" && t.winner && (
+                      <p className="mt-2 text-xs font-semibold text-amber-700">
+                        🏆 {t.winner.name}
+                      </p>
+                    )}
+                  </Link>
                 </motion.div>
               ))}
             </motion.div>

@@ -16,9 +16,8 @@ export default async function BgmiRankings() {
   });
 
   return (
-    <div className="flex flex-1 flex-col bg-white text-zinc-900">
+    <div className="flex flex-1 flex-col text-zinc-900">
       <section className="relative border-b border-zinc-100">
-        <div className="bg-grid absolute inset-0" aria-hidden />
         <div className="relative mx-auto max-w-3xl px-6 py-12">
           <Link
             href="/bgmi"
@@ -36,7 +35,7 @@ export default async function BgmiRankings() {
       </section>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
-        <ol className="overflow-hidden rounded-2xl border border-zinc-100 shadow-sm">
+        <ol className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
           {rankings.map((r, i) => (
             <li
               key={r.id}

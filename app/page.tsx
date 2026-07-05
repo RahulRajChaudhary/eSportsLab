@@ -1,124 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { getBRStandings } from "@/lib/br-standings";
+import { formatDateRange } from "@/lib/format";
+import { GameCarousel } from "@/components/game-carousel";
 
 // Regenerate every 60s — most traffic should hit this cached HTML, not the DB.
 export const revalidate = 60;
-
-// Brand palette pulled from the EL logo: chrome silver, electric royal blue,
-// deep navy edges, cyan glow.
-const games = [
-
-  {
-    slug: "bgmi",
-    name: "BGMI",
-    code: "BG",
-    tag: "Battle Royale",
-    gradient: "from-blue-600 to-indigo-700",
-    live: true,
-  },
-  {
-    slug: "valorant",
-    name: "Valorant",
-    code: "VAL",
-    tag: "Tactical FPS",
-    gradient: "from-sky-500 to-blue-700",
-    live: false,
-  },
-  {
-    slug: "free-fire",
-    name: "Free Fire",
-    code: "FF",
-    tag: "Battle Royale",
-    gradient: "from-indigo-500 to-blue-800",
-    live: false,
-  },
-  {
-    slug: "mlbb",
-    name: "Mobile Legends",
-    code: "ML",
-    tag: "MOBA",
-    gradient: "from-blue-500 to-cyan-600",
-    live: false,
-  },
-  {
-    slug: "wild-rift",
-    name: "Wild Rift",
-    code: "WR",
-    tag: "MOBA",
-    gradient: "from-cyan-500 to-blue-600",
-    live: false,
-  },
-  {
-    slug: "dota-2",
-    name: "Dota 2",
-    code: "D2",
-    tag: "MOBA",
-    gradient: "from-slate-600 to-blue-800",
-    live: false,
-  },
-  {
-    slug: "lol",
-    name: "League of Legends",
-    code: "LoL",
-    tag: "MOBA",
-    gradient: "from-blue-700 to-indigo-900",
-    live: false,
-  },
-  {
-    slug: "chess",
-    name: "Chess",
-    code: "♞",
-    tag: "Mind Sport",
-    gradient: "from-zinc-600 to-blue-900",
-    live: false,
-  },
-];
-
-function GameCard({
-  game,
-  stats,
-}: {
-  game: (typeof games)[number];
-  stats?: string;
-}) {
-  const inner = (
-    <>
-      <div className="mb-4 flex items-center justify-between">
-        <div
-          className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${game.gradient} text-sm font-bold text-white shadow-md shadow-blue-900/20`}
-        >
-          {game.code}
-        </div>
-        {game.live ? (
-          <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-            Explore →
-          </span>
-        ) : (
-          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-400">
-            Coming soon
-          </span>
-        )}
-      </div>
-      <h3 className="font-semibold text-zinc-900">{game.name}</h3>
-      <p className="text-sm text-zinc-500">{game.tag}</p>
-      {stats && <p className="mt-3 text-xs text-blue-700">{stats}</p>}
-    </>
-  );
-
-  const className = `w-64 shrink-0 rounded-2xl border bg-white p-5 transition-all duration-300 ${
-    game.live
-      ? "border-blue-200 shadow-[0_4px_24px_-8px_rgba(37,99,235,0.25)] hover:-translate-y-1 hover:border-blue-400"
-      : "border-zinc-200 opacity-75"
-  }`;
-
-  return game.live ? (
-    <Link href={`/${game.slug}`} className={className}>
-      {inner}
-    </Link>
-  ) : (
-    <div className={className}>{inner}</div>
-  );
-}
 
 export default async function Home() {
   const bgmi = await prisma.game.findUnique({
@@ -128,7 +15,7 @@ export default async function Home() {
     },
   });
 
-  const [latestNews, matchCount] = await Promise.all([
+  const [latestNews, matchCount, featured] = await Promise.all([
     bgmi
       ? prisma.newsPost.findMany({
           where: { gameId: bgmi.id },
@@ -137,11 +24,23 @@ export default async function Home() {
         })
       : Promise.resolve([]),
     prisma.bRMatch.count(),
+    bgmi
+      ? prisma.tournament.findFirst({
+          where: { gameId: bgmi.id },
+          orderBy: [{ startDate: "desc" }],
+        })
+      : Promise.resolve(null),
   ]);
 
-  const bgmiStats = bgmi
-    ? `${bgmi._count.tournaments} tournaments · ${bgmi._count.teams} teams · ${bgmi._count.players} players`
-    : undefined;
+  // Prefer a running event for the "happening now" spotlight.
+  const spotlight = bgmi
+    ? ((await prisma.tournament.findFirst({
+        where: { gameId: bgmi.id, status: "ONGOING" },
+      })) ?? featured)
+    : null;
+  const spotlightStandings = spotlight
+    ? (await getBRStandings(spotlight.id)).slice(0, 5)
+    : [];
 
   const stats = [
     { value: bgmi?._count.tournaments ?? 0, label: "Tournaments tracked" },
@@ -151,31 +50,30 @@ export default async function Home() {
   ];
 
   return (
-    <div className="flex flex-1 flex-col bg-white text-zinc-900">
+    <div className="flex flex-1 flex-col text-zinc-900">
       <main className="flex-1">
-        {/* Hero on box-grid pattern */}
+        {/* Hero sits on the sitewide box-grid backdrop */}
         <section className="relative">
-          <div className="bg-grid absolute inset-0" aria-hidden />
           {/* Decorative accent boxes on the grid */}
           <div
-            className="absolute top-14 left-[8%] hidden h-11 w-11 rounded-md border border-blue-200 bg-blue-50/60 md:block"
+            className="absolute top-6 left-[8%] hidden h-11 w-11 rounded-md border border-blue-200 bg-blue-50/60 md:block"
             aria-hidden
           />
           <div
-            className="absolute top-36 right-[12%] hidden h-11 w-11 rounded-md border border-blue-300 bg-blue-100/50 md:block"
+            className="absolute top-20 right-[12%] hidden h-11 w-11 rounded-md border border-blue-300 bg-blue-100/50 md:block"
             aria-hidden
           />
           <div
-            className="absolute top-60 left-[18%] hidden h-6 w-6 rounded border border-cyan-200 bg-cyan-50/60 md:block"
+            className="absolute top-36 left-[18%] hidden h-6 w-6 rounded border border-cyan-200 bg-cyan-50/60 md:block"
             aria-hidden
           />
 
-          <div className="relative mx-auto max-w-6xl px-6 pt-14 pb-12 text-center sm:pt-20">
+          <div className="relative mx-auto max-w-6xl px-6 pt-6 pb-4 text-center sm:pt-8">
             <span className="animate-fade-up inline-block rounded-full border border-blue-200 bg-blue-50 px-4 py-1 text-xs font-semibold text-blue-700">
-              The home of Indian esports data 
+              The home of Indian esports data
             </span>
             <h1
-              className="animate-fade-up mx-auto mt-5 max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl"
+              className="animate-fade-up mx-auto mt-4 max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl"
               style={{ animationDelay: "80ms" }}
             >
               Every match. Every team.{" "}
@@ -184,7 +82,7 @@ export default async function Home() {
               </span>
             </h1>
             <p
-              className="animate-fade-up mx-auto mt-4 max-w-xl text-lg text-zinc-600"
+              className="animate-fade-up mx-auto mt-3 max-w-xl text-lg text-zinc-600"
               style={{ animationDelay: "160ms" }}
             >
               Standings, brackets, and player careers for the Indian grind —
@@ -193,7 +91,7 @@ export default async function Home() {
 
             {/* Search */}
             <div
-              className="animate-fade-up mx-auto mt-8 max-w-xl"
+              className="animate-fade-up mx-auto mt-6 max-w-xl"
               style={{ animationDelay: "240ms" }}
             >
               <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white p-2 pl-5 shadow-[0_8px_30px_-12px_rgba(37,99,235,0.3)] transition-colors focus-within:border-blue-400">
@@ -228,39 +126,124 @@ export default async function Home() {
                 Search launches with the full BGMI dataset
               </p>
             </div>
-          </div>
-        </section>
 
-        {/* Auto-scrolling game carousel */}
-        <section className="border-y border-zinc-100 bg-gradient-to-b from-white to-blue-50/40 py-10">
-          <div className="mx-auto mb-6 max-w-6xl px-6 text-center">
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              One lab, every title
-            </h2>
-            <p className="mx-auto mt-2 max-w-lg text-zinc-500">
-              BGMI is live. The rest of the lineup is loading.
-            </p>
-          </div>
-          <div className="marquee overflow-hidden">
-            <div className="marquee-track gap-5 px-5">
-              {[...games, ...games].map((game, i) => (
-                <GameCard
-                  key={`${game.slug}-${i}`}
-                  game={game}
-                  stats={game.live ? bgmiStats : undefined}
-                />
-              ))}
+            {/* Primary paths in — don't leave visitors parked on the hero */}
+            <div
+              className="animate-fade-up mt-5 flex flex-wrap items-center justify-center gap-3"
+              style={{ animationDelay: "320ms" }}
+            >
+              <Link
+                href="/bgmi"
+                className="rounded-full bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(37,99,235,0.6)] transition-all hover:-translate-y-0.5 hover:bg-blue-700"
+              >
+                Explore BGMI →
+              </Link>
+              <a
+                href="#how"
+                className="rounded-full border border-zinc-200 bg-white px-6 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:border-blue-300 hover:text-blue-700"
+              >
+                How verification works
+              </a>
             </div>
           </div>
         </section>
 
+        {/* Game carousel — sits inside the fold, right under the hero */}
+        <section className="overflow-hidden border-y border-zinc-100 bg-gradient-to-b from-white to-blue-50/40 py-6">
+          <GameCarousel />
+        </section>
+
+        {/* Happening now — the live reason to stick around */}
+        {spotlight && (
+          <section className="mx-auto max-w-6xl px-6 py-12">
+            <div className="overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-[0_16px_50px_-24px_rgba(37,99,235,0.35)]">
+              <div className="grid md:grid-cols-2">
+                <div className="flex flex-col justify-center p-8">
+                  <span className="inline-flex w-fit items-center gap-2 rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">
+                    {spotlight.status === "ONGOING" && (
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-300" />
+                    )}
+                    {spotlight.status === "ONGOING"
+                      ? "HAPPENING NOW"
+                      : spotlight.status === "UPCOMING"
+                        ? "UP NEXT"
+                        : "LATEST EVENT"}
+                  </span>
+                  <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
+                    {spotlight.name}
+                  </h2>
+                  <p className="mt-2 text-sm text-zinc-500">
+                    {[
+                      spotlight.tier,
+                      spotlight.region,
+                      formatDateRange(spotlight.startDate, spotlight.endDate),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      href={`/tournament/${spotlight.slug}`}
+                      className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                    >
+                      Full standings →
+                    </Link>
+                    <Link
+                      href="/bgmi"
+                      className="rounded-full border border-zinc-200 px-5 py-2 text-sm font-semibold text-zinc-700 transition-colors hover:border-blue-300 hover:text-blue-700"
+                    >
+                      All BGMI events
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="border-t border-blue-50 bg-blue-50/40 p-8 md:border-t-0 md:border-l">
+                  <h3 className="text-xs font-semibold tracking-wide text-zinc-400 uppercase">
+                    Top 5 · Overall points
+                  </h3>
+                  {spotlightStandings.length > 0 ? (
+                    <ol className="mt-4 space-y-2">
+                      {spotlightStandings.map((row, i) => (
+                        <li
+                          key={row.teamId}
+                          className="flex items-center justify-between rounded-xl border border-blue-100/60 bg-white px-4 py-2.5 text-sm shadow-sm"
+                        >
+                          <span className="flex items-center gap-3">
+                            <span
+                              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                                i === 0
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-blue-50 text-blue-700"
+                              }`}
+                            >
+                              {i + 1}
+                            </span>
+                            <span className="font-medium">{row.teamName}</span>
+                          </span>
+                          <span className="font-bold text-blue-700">
+                            {row.points} pts
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-4 text-sm text-zinc-400">
+                      Standings go live with the first match.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Stats strip */}
-        <section className="mx-auto max-w-6xl px-6 py-10">
+        <section className="mx-auto max-w-6xl px-6 pb-10">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
             {stats.map((s) => (
               <div
                 key={s.label}
-                className="rounded-2xl border border-zinc-100 bg-white p-6 text-center shadow-sm"
+                className="rounded-2xl border border-zinc-100 bg-white p-6 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
               >
                 <p className="text-3xl font-bold text-blue-600">{s.value}</p>
                 <p className="mt-1 text-sm text-zinc-500">{s.label}</p>
@@ -270,7 +253,7 @@ export default async function Home() {
         </section>
 
         {/* How it works */}
-        <section className="bg-gradient-to-b from-blue-50/40 to-white py-12">
+        <section id="how" className="bg-gradient-to-b from-blue-50/40 to-white py-12">
           <div className="mx-auto max-w-6xl px-6">
             <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
               Wiki-grade accuracy, community speed

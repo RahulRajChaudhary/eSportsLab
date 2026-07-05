@@ -122,7 +122,8 @@ async function main() {
       gameId: bgmi.id,
       tier: "Tier 2",
       region: "India",
-      startDate: new Date("2026-07-01"),
+      eventType: "Online",
+      startDate: new Date("2026-06-20"),
       endDate: new Date("2026-07-07"),
       prizePool: 500000,
       organizer: "Chained Gaming Org",
@@ -175,8 +176,37 @@ async function main() {
     data: { tournamentId: brTournament.id },
   });
 
+  // Qualifiers already wrapped up (before "today" in seed data), Semi
+  // Finals is the currently-ongoing stage with real matches, Grand Finals
+  // is dated but has no matches yet — covers all three calendar states.
+  await prisma.stage.create({
+    data: {
+      tournamentId: brTournament.id,
+      name: "Qualifiers",
+      order: 0,
+      startDate: new Date("2026-06-20"),
+      endDate: new Date("2026-06-22"),
+    },
+  });
+
   const groupStage = await prisma.stage.create({
-    data: { tournamentId: brTournament.id, name: "Group Stage", order: 0 },
+    data: {
+      tournamentId: brTournament.id,
+      name: "Semi Finals",
+      order: 1,
+      startDate: new Date("2026-07-01"),
+      endDate: new Date("2026-07-03"),
+    },
+  });
+
+  await prisma.stage.create({
+    data: {
+      tournamentId: brTournament.id,
+      name: "Grand Finals",
+      order: 2,
+      startDate: new Date("2026-07-06"),
+      endDate: new Date("2026-07-07"),
+    },
   });
 
   // Two matches, all 16 teams placing differently each time (indices align
@@ -272,6 +302,7 @@ async function main() {
       gameId: bgmi.id,
       tier: "Tier 3",
       region: "India",
+      eventType: "LAN",
       startDate: new Date("2026-02-10"),
       endDate: new Date("2026-02-14"),
       prizePool: 200000,
@@ -279,6 +310,7 @@ async function main() {
       sourceLink: "https://youtube.com/watch?v=fake-winter-clash-broadcast",
       status: "COMPLETED",
       winnerTeamId: brTeams[0].id,
+      runnerUpTeamId: brTeams[1].id,
     },
   });
 
@@ -335,6 +367,7 @@ async function main() {
       sourceLink: "https://youtube.com/watch?v=fake-ers-broadcast",
       status: "COMPLETED",
       winnerTeamId: vertexGaming.id,
+      runnerUpTeamId: emberRift.id,
     },
   });
 

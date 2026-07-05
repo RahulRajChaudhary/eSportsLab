@@ -23,7 +23,7 @@ const columns = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-zinc-100 bg-gradient-to-b from-white to-blue-50/50">
+    <footer className="border-t border-zinc-100/80 bg-blue-50/20">
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-10 md:grid-cols-6">
           {/* Brand */}
