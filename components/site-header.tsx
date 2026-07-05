@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-20 border-b border-zinc-100 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-zinc-100 bg-white backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <Link href="/" className="flex items-center gap-2">
           <Image

@@ -7,6 +7,7 @@ export const revalidate = 60;
 // Brand palette pulled from the EL logo: chrome silver, electric royal blue,
 // deep navy edges, cyan glow.
 const games = [
+
   {
     slug: "bgmi",
     name: "BGMI",
@@ -157,24 +158,24 @@ export default async function Home() {
           <div className="bg-grid absolute inset-0" aria-hidden />
           {/* Decorative accent boxes on the grid */}
           <div
-            className="absolute top-24 left-[8%] hidden h-11 w-11 rounded-md border border-blue-200 bg-blue-50/60 md:block"
+            className="absolute top-14 left-[8%] hidden h-11 w-11 rounded-md border border-blue-200 bg-blue-50/60 md:block"
             aria-hidden
           />
           <div
-            className="absolute top-52 right-[12%] hidden h-11 w-11 rounded-md border border-blue-300 bg-blue-100/50 md:block"
+            className="absolute top-36 right-[12%] hidden h-11 w-11 rounded-md border border-blue-300 bg-blue-100/50 md:block"
             aria-hidden
           />
           <div
-            className="absolute top-80 left-[18%] hidden h-6 w-6 rounded border border-cyan-200 bg-cyan-50/60 md:block"
+            className="absolute top-60 left-[18%] hidden h-6 w-6 rounded border border-cyan-200 bg-cyan-50/60 md:block"
             aria-hidden
           />
 
-          <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-16 text-center sm:pt-32">
+          <div className="relative mx-auto max-w-6xl px-6 pt-14 pb-12 text-center sm:pt-20">
             <span className="animate-fade-up inline-block rounded-full border border-blue-200 bg-blue-50 px-4 py-1 text-xs font-semibold text-blue-700">
-              The home of Indian esports data
+              The home of Indian esports data 
             </span>
             <h1
-              className="animate-fade-up mx-auto mt-6 max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl"
+              className="animate-fade-up mx-auto mt-5 max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl"
               style={{ animationDelay: "80ms" }}
             >
               Every match. Every team.{" "}
@@ -183,17 +184,16 @@ export default async function Home() {
               </span>
             </h1>
             <p
-              className="animate-fade-up mx-auto mt-6 max-w-xl text-lg text-zinc-600"
+              className="animate-fade-up mx-auto mt-4 max-w-xl text-lg text-zinc-600"
               style={{ animationDelay: "160ms" }}
             >
-              Tournament standings, brackets, and player careers for the Indian
-              competitive scene — crowd-sourced, source-linked, and moderated
-              before it goes live.
+              Standings, brackets, and player careers for the Indian grind —
+              crowd-sourced, source-linked, checked before it goes live.
             </p>
 
             {/* Search */}
             <div
-              className="animate-fade-up mx-auto mt-10 max-w-xl"
+              className="animate-fade-up mx-auto mt-8 max-w-xl"
               style={{ animationDelay: "240ms" }}
             >
               <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white p-2 pl-5 shadow-[0_8px_30px_-12px_rgba(37,99,235,0.3)] transition-colors focus-within:border-blue-400">
@@ -232,14 +232,13 @@ export default async function Home() {
         </section>
 
         {/* Auto-scrolling game carousel */}
-        <section className="border-y border-zinc-100 bg-gradient-to-b from-white to-blue-50/40 py-14">
-          <div className="mx-auto mb-8 max-w-6xl px-6 text-center">
+        <section className="border-y border-zinc-100 bg-gradient-to-b from-white to-blue-50/40 py-10">
+          <div className="mx-auto mb-6 max-w-6xl px-6 text-center">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
               One lab, every title
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-zinc-500">
-              We ship one game at a time, verified and moderated properly —
-              starting with BGMI.
+              BGMI is live. The rest of the lineup is loading.
             </p>
           </div>
           <div className="marquee overflow-hidden">
@@ -256,7 +255,7 @@ export default async function Home() {
         </section>
 
         {/* Stats strip */}
-        <section className="mx-auto max-w-6xl px-6 py-16">
+        <section className="mx-auto max-w-6xl px-6 py-10">
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
             {stats.map((s) => (
               <div
@@ -271,12 +270,12 @@ export default async function Home() {
         </section>
 
         {/* How it works */}
-        <section className="bg-gradient-to-b from-blue-50/40 to-white py-16">
+        <section className="bg-gradient-to-b from-blue-50/40 to-white py-12">
           <div className="mx-auto max-w-6xl px-6">
             <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
               Wiki-grade accuracy, community speed
             </h2>
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
+            <div className="mt-8 grid gap-6 md:grid-cols-3">
               {[
                 {
                   step: "01",
@@ -315,7 +314,7 @@ export default async function Home() {
 
         {/* News */}
         {latestNews.length > 0 && (
-          <section id="news" className="mx-auto max-w-6xl px-6 py-16">
+          <section id="news" className="mx-auto max-w-6xl px-6 py-12">
             <h2 className="mb-6 text-2xl font-bold tracking-tight">
               Latest news
             </h2>

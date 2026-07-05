@@ -263,6 +263,55 @@ async function main() {
     });
   }
 
+  // A completed and an upcoming BGMI tournament alongside the ongoing one,
+  // so the /bgmi roadmap has real past/upcoming cards to render.
+  const brTournamentPast = await prisma.tournament.create({
+    data: {
+      slug: "bgmi-winter-clash-2026",
+      name: "BGMI Winter Clash 2026",
+      gameId: bgmi.id,
+      tier: "Tier 3",
+      region: "India",
+      startDate: new Date("2026-02-10"),
+      endDate: new Date("2026-02-14"),
+      prizePool: 200000,
+      organizer: "Winter Clash Org",
+      sourceLink: "https://youtube.com/watch?v=fake-winter-clash-broadcast",
+      status: "COMPLETED",
+      winnerTeamId: brTeams[0].id,
+    },
+  });
+
+  await prisma.tournamentTeam.createMany({
+    data: brTeams.slice(0, 8).map((team) => ({
+      tournamentId: brTournamentPast.id,
+      teamId: team.id,
+    })),
+  });
+
+  const brTournamentUpcoming = await prisma.tournament.create({
+    data: {
+      slug: "bgmi-monsoon-invitational-2026",
+      name: "BGMI Monsoon Invitational 2026",
+      gameId: bgmi.id,
+      tier: "Tier 2",
+      region: "India",
+      startDate: new Date("2026-09-05"),
+      endDate: new Date("2026-09-12"),
+      prizePool: 750000,
+      organizer: "Monsoon Esports",
+      sourceLink: "https://youtube.com/watch?v=fake-monsoon-announcement",
+      status: "UPCOMING",
+    },
+  });
+
+  await prisma.tournamentTeam.createMany({
+    data: brTeams.slice(4, 12).map((team) => ({
+      tournamentId: brTournamentUpcoming.id,
+      teamId: team.id,
+    })),
+  });
+
   // ---------------------------------------------------------------------
   // Valorant (Head-to-Head) — proves the schema's other shape independently
   // ---------------------------------------------------------------------
@@ -285,6 +334,7 @@ async function main() {
       organizer: "Ember Rift Org",
       sourceLink: "https://youtube.com/watch?v=fake-ers-broadcast",
       status: "COMPLETED",
+      winnerTeamId: vertexGaming.id,
     },
   });
 
@@ -401,7 +451,7 @@ async function main() {
     games: 2,
     brTeams: brTeams.length,
     h2hTeams: 2,
-    tournaments: 2,
+    tournaments: 4,
     users: 2,
     admin: admin.email,
   });

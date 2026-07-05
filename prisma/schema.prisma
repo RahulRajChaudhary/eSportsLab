@@ -57,6 +57,11 @@ model Tournament {
   status     TournamentStatus @default(UPCOMING)
   createdAt  DateTime         @default(now())
 
+  // Set by admin once a tournament concludes — not recomputed from
+  // standings, same "compute once, then store" pattern as pointsEarned.
+  winnerTeamId String?
+  winner       Team?   @relation("TournamentWinner", fields: [winnerTeamId], references: [id])
+
   stages             Stage[]
   participants       TournamentTeam[]
   pointsSystem       PointsSystem?
@@ -220,6 +225,7 @@ model Team {
   groupStandingsRows GroupStandingsRow[]
   tournamentTeams    TournamentTeam[]
   rankingSnapshots   RankingSnapshot[]
+  tournamentsWon     Tournament[]        @relation("TournamentWinner")
 }
 
 model Player {
