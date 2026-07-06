@@ -23,7 +23,6 @@ enum TournamentStatus {
   UPCOMING
   ONGOING
   COMPLETED
-  
 }
 
 model Game {
@@ -42,30 +41,41 @@ model Game {
 }
 
 model Tournament {
-  id         String           @id @default(cuid())
-  slug       String           @unique
-  name       String
-  gameId     String
-  game       Game             @relation(fields: [gameId], references: [id])
-  tier       String?
-  region     String?
+  id                 String           @id @default(cuid())
+  slug               String           @unique
+  name               String
+  gameId             String
+  game               Game             @relation(fields: [gameId], references: [id])
+  tier               String?
+  region             String?
   // "Online", "LAN", "Mix (Online + LAN)" — free text since orgs don't use
   // a fixed vocabulary here, shown as-is on the overview card.
-  eventType  String?
-  startDate  DateTime?
-  endDate    DateTime?
-  prizePool  Int?
-  organizer  String?
-  sourceLink String
-  status     TournamentStatus @default(UPCOMING)
-  createdAt  DateTime         @default(now())
+  eventType          String?
+  // Umbrella series this edition belongs to (e.g. "BMPS") and the edition
+  // label itself (e.g. "2026 Edition") — distinct from the tournament name.
+  series             String?
+  season             String?
+  startDate          DateTime?
+  endDate            DateTime?
+  prizePool          Int?
+  // Admin-entered at seed/edit time, not a live FX conversion — keeps the
+  // displayed USD figure stable regardless of exchange rate drift.
+  prizePoolUsd       Int?
+  // Prize distribution by placement, e.g. [{ rank: "1st", amountInr: 2000000 }].
+  // Shaped like PointsSystem.placementPointsJson — a per-tournament admin
+  // config, not a relational table, since ranks/groupings vary freely.
+  prizeBreakdownJson Json?
+  organizer          String?
+  sourceLink         String
+  status             TournamentStatus @default(UPCOMING)
+  createdAt          DateTime         @default(now())
 
   // Set by admin once a tournament concludes — not recomputed from
   // standings, same "compute once, then store" pattern as pointsEarned.
-  winnerTeamId String?
-  winner       Team?   @relation("TournamentWinner", fields: [winnerTeamId], references: [id])
+  winnerTeamId   String?
+  winner         Team?   @relation("TournamentWinner", fields: [winnerTeamId], references: [id])
   runnerUpTeamId String?
-  runnerUp       Team? @relation("TournamentRunnerUp", fields: [runnerUpTeamId], references: [id])
+  runnerUp       Team?   @relation("TournamentRunnerUp", fields: [runnerUpTeamId], references: [id])
 
   stages             Stage[]
   participants       TournamentTeam[]
@@ -74,6 +84,23 @@ model Tournament {
   brMatches          BRMatch[]
   h2hMatches         H2HMatch[]
   groupStandingsRows GroupStandingsRow[]
+  awards             TournamentAward[]
+}
+
+// Per-tournament special awards (MVP, Finals MVP, Best IGL, Best Clutch, ...).
+// Category is free text since orgs invent their own award names; relational
+// (not JSON) because it needs to link to a real Player for name/avatar
+// display, same reasoning as BRMatchEntry linking to Team.
+model TournamentAward {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  category     String
+  playerId     String?
+  player       Player?    @relation(fields: [playerId], references: [id])
+  teamId       String?
+  team         Team?      @relation(fields: [teamId], references: [id])
+  order        Int        @default(0)
 }
 
 // Join table: which teams are participating in a tournament (independent of
@@ -227,15 +254,16 @@ model Team {
   socials   Json?
   createdAt DateTime @default(now())
 
-  rosterHistory      RosterHistory[]
-  brMatchEntries     BRMatchEntry[]
-  h2hMatchesAsTeamA  H2HMatch[]          @relation("H2HTeamA")
-  h2hMatchesAsTeamB  H2HMatch[]          @relation("H2HTeamB")
-  groupStandingsRows GroupStandingsRow[]
-  tournamentTeams    TournamentTeam[]
-  rankingSnapshots   RankingSnapshot[]
-  tournamentsWon     Tournament[]        @relation("TournamentWinner")
-  tournamentsRunnerUp Tournament[]       @relation("TournamentRunnerUp")
+  rosterHistory       RosterHistory[]
+  brMatchEntries      BRMatchEntry[]
+  h2hMatchesAsTeamA   H2HMatch[]          @relation("H2HTeamA")
+  h2hMatchesAsTeamB   H2HMatch[]          @relation("H2HTeamB")
+  groupStandingsRows  GroupStandingsRow[]
+  tournamentTeams     TournamentTeam[]
+  rankingSnapshots    RankingSnapshot[]
+  tournamentsWon      Tournament[]        @relation("TournamentWinner")
+  tournamentsRunnerUp Tournament[]        @relation("TournamentRunnerUp")
+  tournamentAwards    TournamentAward[]
 }
 
 model Player {
@@ -251,6 +279,7 @@ model Player {
 
   rosterHistory    RosterHistory[]
   rankingSnapshots RankingSnapshot[]
+  tournamentAwards TournamentAward[]
 }
 
 // Past + current team memberships. Team page "current roster" = rows with

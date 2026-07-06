@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { aggregateBRStandings, type BRStandingsRow } from "@/lib/br-standings";
-import { formatDateRange, formatINR } from "@/lib/format";
+import { formatDateRange, formatINR, formatUSD } from "@/lib/format";
 import { TeamAvatar } from "@/components/team-avatar";
 import { TournamentCalendar } from "@/components/tournament-calendar";
+import { StageRoadmapTimeline } from "@/components/stage-roadmap-timeline";
 
 export const revalidate = 60;
 
@@ -84,10 +85,10 @@ export default async function TournamentDetail({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; phase?: string }>;
 }) {
   const { slug } = await params;
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, phase: rawPhase } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === rawTab)
     ? (rawTab as TabKey)
     : "overview";
@@ -116,6 +117,20 @@ export default async function TournamentDetail({
         },
       },
       groupStandingsRows: { include: { team: true } },
+      awards: { orderBy: { order: "asc" }, include: { player: true, team: true } },
+      participants: {
+        include: {
+          team: {
+            include: {
+              rosterHistory: {
+                where: { leftAt: null },
+                orderBy: { joinedAt: "asc" },
+                include: { player: true },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -125,6 +140,20 @@ export default async function TournamentDetail({
   const stages = tournament.stages;
   const finalStage = stages.length > 0 ? stages[stages.length - 1] : null;
   const leagueStages = finalStage ? stages.slice(0, -1) : [];
+
+  // League has anywhere from a couple of rounds to five-plus (Qualifiers,
+  // Wildcard, Survival Stage, ...), fully admin-named — so default to
+  // whichever phase is actually live, falling back to the most recent one,
+  // rather than always landing on phase 1.
+  const activePhaseId = (() => {
+    if (leagueStages.some((s) => s.id === rawPhase)) return rawPhase as string;
+    const ongoing = leagueStages.find((s) => stageStatus(s) === "ONGOING");
+    if (ongoing) return ongoing.id;
+    const upcoming = leagueStages.find((s) => stageStatus(s) === "UPCOMING");
+    if (upcoming) return upcoming.id;
+    return leagueStages[leagueStages.length - 1]?.id;
+  })();
+  const activeLeagueStage = leagueStages.find((s) => s.id === activePhaseId) ?? null;
 
   const groupedStandings = new Map<string, typeof tournament.groupStandingsRows>();
   for (const row of tournament.groupStandingsRows) {
@@ -311,33 +340,16 @@ export default async function TournamentDetail({
                 <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
                   Format
                 </h2>
-                {stages.length === 0 ? (
-                  <p className="text-sm text-zinc-400">Format not announced yet.</p>
-                ) : (
-                  <ol className="relative space-y-6 border-l-2 border-blue-100 pl-6">
-                    {stages.map((stage) => {
-                      const st = stageStatus(stage);
-                      return (
-                        <li key={stage.id} className="relative">
-                          <span className="absolute top-1 -left-[1.9rem] h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow" />
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold text-zinc-900">{stage.name}</span>
-                            {st !== "TBA" && (
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyles[st] ?? statusStyles.COMPLETED}`}
-                              >
-                                {st}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-zinc-500">
-                            {formatDateRange(stage.startDate, stage.endDate)}
-                          </p>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
+                <StageRoadmapTimeline
+                  slug={slug}
+                  stages={stages.map((stage) => ({
+                    id: stage.id,
+                    name: stage.name,
+                    startDate: stage.startDate,
+                    endDate: stage.endDate,
+                    status: stageStatus(stage),
+                  }))}
+                />
               </section>
 
               <section>
@@ -346,6 +358,62 @@ export default async function TournamentDetail({
                 </h2>
                 <TournamentCalendar stages={stages} />
               </section>
+
+              {Array.isArray(tournament.prizeBreakdownJson) && tournament.prizeBreakdownJson.length > 0 && (
+                <section>
+                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+                    Prize Pool Distribution
+                  </h2>
+                  <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+                    <table className="w-full text-sm">
+                      <thead className="border-b border-zinc-100 bg-blue-50/50 text-left text-xs font-semibold uppercase text-zinc-500">
+                        <tr>
+                          <th className="px-4 py-3">Placement</th>
+                          <th className="px-4 py-3 text-right">Prize</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(tournament.prizeBreakdownJson as { rank: string; amountInr: number }[]).map((row) => (
+                          <tr key={row.rank} className="border-b border-zinc-50 last:border-0">
+                            <td className="px-4 py-3 font-medium">{row.rank}</td>
+                            <td className="px-4 py-3 text-right font-bold text-blue-700">
+                              {formatINR(row.amountInr)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
+
+              {tournament.awards.length > 0 && (
+                <section>
+                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+                    Special Awards
+                  </h2>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {tournament.awards.map((award) => {
+                      const name = award.player?.name ?? award.team?.name ?? "TBA";
+                      const logoUrl = award.player ? null : (award.team?.logoUrl ?? null);
+                      return (
+                        <div
+                          key={award.id}
+                          className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm"
+                        >
+                          <TeamAvatar name={name} logoUrl={logoUrl} size={40} />
+                          <div>
+                            <p className="text-xs font-bold tracking-wide text-cyan-600 uppercase">
+                              {award.category}
+                            </p>
+                            <p className="font-semibold text-blue-900">{name}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
             </div>
 
             <section className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
@@ -396,10 +464,31 @@ export default async function TournamentDetail({
                     <dt className="flex items-center gap-1.5 text-zinc-400">
                       <span aria-hidden>💰</span> Total Prize Pool
                     </dt>
-                    <dd className="font-medium">
+                    <dd className="text-right font-medium">
                       {tournament.prizePool ? formatINR(tournament.prizePool) : "TBA"}
+                      {tournament.prizePoolUsd && (
+                        <span className="block text-xs font-normal text-zinc-400">
+                          ({formatUSD(tournament.prizePoolUsd)})
+                        </span>
+                      )}
                     </dd>
                   </div>
+                  {tournament.series && (
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="flex items-center gap-1.5 text-zinc-400">
+                        <span aria-hidden>🧩</span> Series
+                      </dt>
+                      <dd className="font-medium">{tournament.series}</dd>
+                    </div>
+                  )}
+                  {tournament.season && (
+                    <div className="flex items-center justify-between gap-4">
+                      <dt className="flex items-center gap-1.5 text-zinc-400">
+                        <span aria-hidden>🗓️</span> Season
+                      </dt>
+                      <dd className="font-medium">{tournament.season}</dd>
+                    </div>
+                  )}
                   {tournament.organizer && (
                     <div className="flex items-center justify-between gap-4">
                       <dt className="flex items-center gap-1.5 text-zinc-400">
@@ -445,23 +534,96 @@ export default async function TournamentDetail({
         )}
 
         {tab === "league" && (
-          <div className="space-y-10">
+          <div className="space-y-8">
             {leagueStages.length === 0 ? (
               <p className="text-sm text-zinc-400">
                 No league rounds — this tournament goes straight to Grand Finals.
               </p>
             ) : (
-              leagueStages.map((stage) => renderStageSection(stage))
+              <>
+                <nav className="flex flex-wrap gap-2">
+                  {leagueStages.map((stage) => {
+                    const st = stageStatus(stage);
+                    const active = stage.id === activePhaseId;
+                    return (
+                      <Link
+                        key={stage.id}
+                        href={`/tournament/${slug}?tab=league&phase=${stage.id}`}
+                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                          active
+                            ? "bg-blue-600 text-white"
+                            : "border border-zinc-200 text-zinc-500 hover:border-blue-300 hover:text-blue-700"
+                        }`}
+                      >
+                        {stage.name}
+                        {st === "ONGOING" && (
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                              active ? "bg-white/20 text-white" : "bg-blue-600 text-white"
+                            }`}
+                          >
+                            LIVE
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </nav>
+                {activeLeagueStage && renderStageSection(activeLeagueStage)}
+              </>
             )}
           </div>
         )}
 
         {tab === "finals" && (
-          <div>
+          <div className="space-y-10">
             {finalStage ? (
               renderStageSection(finalStage)
             ) : (
               <p className="text-sm text-zinc-400">Grand Finals not scheduled yet.</p>
+            )}
+
+            {tournament.participants.length > 0 && (
+              <section>
+                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+                  Team Rosters
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {tournament.participants.map((participant) => {
+                    const { team } = participant;
+                    const coach = team.rosterHistory.find((r) => r.role === "Coach");
+                    const players = team.rosterHistory.filter((r) => r.role !== "Coach");
+                    return (
+                      <div
+                        key={participant.id}
+                        className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm"
+                      >
+                        <div className="mb-3 flex items-center gap-3">
+                          <TeamAvatar name={team.name} logoUrl={team.logoUrl} size={40} />
+                          <p className="font-semibold">{team.name}</p>
+                        </div>
+                        {players.length === 0 ? (
+                          <p className="text-sm text-zinc-400">Roster TBA.</p>
+                        ) : (
+                          <ul className="space-y-1.5 text-sm">
+                            {players.map((r) => (
+                              <li key={r.id} className="flex items-center justify-between gap-3">
+                                <span className="text-zinc-700">{r.player.name}</span>
+                                <span className="text-xs font-medium text-zinc-400">{r.role}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {coach && (
+                          <p className="mt-3 border-t border-zinc-100 pt-2 text-xs text-zinc-400">
+                            Coach <span className="font-medium text-zinc-600">{coach.player.name}</span>
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             )}
           </div>
         )}

@@ -36,6 +36,7 @@ async function main() {
   await prisma.pointsSystem.deleteMany();
   await prisma.stage.deleteMany();
   await prisma.tournamentTeam.deleteMany();
+  await prisma.tournamentAward.deleteMany();
   await prisma.tournament.deleteMany();
   await prisma.player.deleteMany();
   await prisma.team.deleteMany();
@@ -89,7 +90,11 @@ async function main() {
   );
 
   const brRoles = ["Assaulter", "Support", "Sniper", "IGL"];
-  for (const team of brTeams) {
+  // Indexed by team slug, then role index — used later to hand out
+  // TournamentAward rows (MVP, Best IGL, Best Clutch) to specific players.
+  const brPlayersByTeam = new Map<string, Awaited<ReturnType<typeof prisma.player.create>>[]>();
+  for (const [teamIndex, team] of brTeams.entries()) {
+    const teamPlayers: Awaited<ReturnType<typeof prisma.player.create>>[] = [];
     for (let i = 0; i < 4; i++) {
       const playerName = `${team.name.split(" ")[0]}${i + 1}`;
       const player = await prisma.player.create({
@@ -108,7 +113,53 @@ async function main() {
           joinedAt: new Date("2026-01-01"),
         },
       });
+      teamPlayers.push(player);
     }
+
+    // Half the lobby carries a 5th, in-game substitute — real BGMI orgs
+    // vary between a lean 4-player roster and one with a bench sub.
+    if (teamIndex % 2 === 0) {
+      const subName = `${team.name.split(" ")[0]}5`;
+      const sub = await prisma.player.create({
+        data: {
+          slug: `${team.slug}-p5`,
+          name: subName,
+          gameId: bgmi.id,
+          country: "IN",
+        },
+      });
+      await prisma.rosterHistory.create({
+        data: {
+          playerId: sub.id,
+          teamId: team.id,
+          role: "Substitute",
+          joinedAt: new Date("2026-01-01"),
+        },
+      });
+      teamPlayers.push(sub);
+    }
+
+    // Every team carries a non-playing coach, shown separately on the
+    // Grand Finals team-roster cards rather than mixed in with players.
+    const coach = await prisma.player.create({
+      data: {
+        slug: `${team.slug}-coach`,
+        name: `${team.name.split(" ")[0]} Coach`,
+        gameId: bgmi.id,
+        country: "IN",
+      },
+    });
+    await prisma.rosterHistory.create({
+      data: {
+        playerId: coach.id,
+        teamId: team.id,
+        role: "Coach",
+        joinedAt: new Date("2026-01-01"),
+      },
+    });
+    teamPlayers.push(coach);
+
+    brPlayersByTeam.set(team.slug, teamPlayers);
   }
 
   // ---------------------------------------------------------------------
@@ -122,10 +173,21 @@ async function main() {
       gameId: bgmi.id,
       tier: "Tier 2",
       region: "India",
-      eventType: "Online",
+      eventType: "Mix (Online + LAN)",
+      series: "CMS",
+      season: "Season 1",
       startDate: new Date("2026-06-20"),
       endDate: new Date("2026-07-07"),
       prizePool: 500000,
+      prizePoolUsd: 6000,
+      prizeBreakdownJson: [
+        { rank: "1st", amountInr: 200000 },
+        { rank: "2nd", amountInr: 120000 },
+        { rank: "3rd", amountInr: 70000 },
+        { rank: "4th", amountInr: 50000 },
+        { rank: "5th – 6th", amountInr: 20000 },
+        { rank: "7th – 8th", amountInr: 10000 },
+      ],
       organizer: "Chained Gaming Org",
       sourceLink: "https://youtube.com/watch?v=fake-cms1-broadcast",
       status: "ONGOING",
@@ -176,9 +238,10 @@ async function main() {
     data: { tournamentId: brTournament.id },
   });
 
-  // Qualifiers already wrapped up (before "today" in seed data), Semi
-  // Finals is the currently-ongoing stage with real matches, Grand Finals
-  // is dated but has no matches yet — covers all three calendar states.
+  // Five phases total (4 league + Grand Finals) — deliberately mixes naming
+  // styles (numbered rounds, Wildcard, Survival Stage) since different real
+  // orgs use different vocabulary; the League tab must render whichever
+  // stages exist, in order, regardless of how many or what they're called.
   await prisma.stage.create({
     data: {
       tournamentId: brTournament.id,
@@ -189,11 +252,32 @@ async function main() {
     },
   });
 
-  const groupStage = await prisma.stage.create({
+  await prisma.stage.create({
     data: {
       tournamentId: brTournament.id,
-      name: "Semi Finals",
+      name: "Round 2",
       order: 1,
+      startDate: new Date("2026-06-24"),
+      endDate: new Date("2026-06-26"),
+    },
+  });
+
+  await prisma.stage.create({
+    data: {
+      tournamentId: brTournament.id,
+      name: "Wildcard",
+      order: 2,
+      startDate: new Date("2026-06-28"),
+      endDate: new Date("2026-06-29"),
+    },
+  });
+
+  // The one league phase with real matches/standings wired up.
+  const survivalStage = await prisma.stage.create({
+    data: {
+      tournamentId: brTournament.id,
+      name: "Survival Stage",
+      order: 3,
       startDate: new Date("2026-07-01"),
       endDate: new Date("2026-07-03"),
     },
@@ -203,7 +287,7 @@ async function main() {
     data: {
       tournamentId: brTournament.id,
       name: "Grand Finals",
-      order: 2,
+      order: 4,
       startDate: new Date("2026-07-06"),
       endDate: new Date("2026-07-07"),
     },
@@ -260,7 +344,7 @@ async function main() {
     const match = await prisma.bRMatch.create({
       data: {
         tournamentId: brTournament.id,
-        stageId: groupStage.id,
+        stageId: survivalStage.id,
         matchNumber: matchNumber + 1,
         mapName: brMapPool[matchNumber % brMapPool.length],
         scheduledAt: new Date(`2026-07-0${matchNumber + 1}T14:00:00Z`),
@@ -292,6 +376,31 @@ async function main() {
       })),
     });
   }
+
+  // Special awards called out on the Overview tab — tied to real seeded
+  // players so the UI can show name + avatar, not just a category label.
+  await prisma.tournamentAward.createMany({
+    data: [
+      {
+        tournamentId: brTournament.id,
+        category: "MVP",
+        playerId: brPlayersByTeam.get("chained-esports")![0].id,
+        order: 0,
+      },
+      {
+        tournamentId: brTournament.id,
+        category: "Best IGL",
+        playerId: brPlayersByTeam.get("chained-esports")![3].id,
+        order: 1,
+      },
+      {
+        tournamentId: brTournament.id,
+        category: "Best Clutch",
+        playerId: brPlayersByTeam.get("nova-blitz")![2].id,
+        order: 2,
+      },
+    ],
+  });
 
   // A completed and an upcoming BGMI tournament alongside the ongoing one,
   // so the /bgmi roadmap has real past/upcoming cards to render.
