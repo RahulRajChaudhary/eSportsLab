@@ -115,7 +115,7 @@ export default async function BgmiHub() {
                 {tournaments.map((t) => (
                   <li key={t.id}>
                     <Link
-                      href={`/tournament/${t.slug}`}
+                      href={`/tournament/${game.slug}/${t.slug}`}
                       className="block rounded-2xl border border-zinc-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
                     >
                       <div className="flex items-center justify-between gap-4">
@@ -167,7 +167,12 @@ export default async function BgmiHub() {
                             {i + 1}
                           </td>
                           <td className="px-4 py-3 font-medium">
-                            {row.teamName}
+                            <Link
+                              href={`/team/${row.teamSlug}`}
+                              className="hover:text-blue-700 hover:underline"
+                            >
+                              {row.teamName}
+                            </Link>
                           </td>
                           <td className="px-4 py-3 text-right text-zinc-600">
                             {row.matches}
@@ -195,7 +200,7 @@ export default async function BgmiHub() {
           </div>
 
           <div className="mt-12 w-full shrink-0 space-y-10 lg:mt-0 lg:w-[420px]">
-            <TournamentRoadmapTimeline year={currentYear} tournaments={yearRoadmap} />
+            <TournamentRoadmapTimeline year={currentYear} gameSlug={game.slug} tournaments={yearRoadmap} />
 
             <section className="relative z-10 bg-white">
               <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">

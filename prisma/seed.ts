@@ -162,6 +162,60 @@ async function main() {
     brPlayersByTeam.set(team.slug, teamPlayers);
   }
 
+  // A further batch of known-org teams that exist in the database (so Team
+  // pages have something real to browse) without being wired into every
+  // event's bracket — a real scene has far more known orgs than any single
+  // tournament's ~16-slot lobby, and open qualifiers with 100-200+ entrants
+  // aren't worth modeling for a launch-scope seed.
+  const additionalBrTeamNames = [
+    "Revenant Core",
+    "Global Vipers",
+    "Orbit Esports",
+    "Blaze Ind",
+    "Fable Esports",
+    "Blind Fury",
+    "Hydra Squad",
+    "Celestial Gaming",
+  ];
+
+  const additionalBrTeams = await Promise.all(
+    additionalBrTeamNames.map((name) =>
+      prisma.team.create({
+        data: {
+          slug: name.toLowerCase().replace(/\s+/g, "-"),
+          name,
+          gameId: bgmi.id,
+          region: "India",
+        },
+      }),
+    ),
+  );
+
+  for (const team of additionalBrTeams) {
+    const teamPlayers: Awaited<ReturnType<typeof prisma.player.create>>[] = [];
+    for (let i = 0; i < 4; i++) {
+      const playerName = `${team.name.split(" ")[0]}${i + 1}`;
+      const player = await prisma.player.create({
+        data: {
+          slug: `${team.slug}-p${i + 1}`,
+          name: playerName,
+          gameId: bgmi.id,
+          country: "IN",
+        },
+      });
+      await prisma.rosterHistory.create({
+        data: {
+          playerId: player.id,
+          teamId: team.id,
+          role: brRoles[i],
+          joinedAt: new Date("2026-01-01"),
+        },
+      });
+      teamPlayers.push(player);
+    }
+    brPlayersByTeam.set(team.slug, teamPlayers);
+  }
+
   // ---------------------------------------------------------------------
   // BGMI Tournament — the full BR shape (PointsSystem, Stage, BRMatch,
   // BRMatchEntry, BRStandingsColumn) wired together end to end.
@@ -293,8 +347,9 @@ async function main() {
     },
   });
 
-  // Two matches, all 16 teams placing differently each time (indices align
-  // with brTeamNames order). Kills per match must sum to at most 60 — a
+  // Six matches (enough to demo horizontal scrolling on the match-wise
+  // standings table), all 16 teams placing differently each time (indices
+  // align with brTeamNames order). Kills per match must sum to at most 60 — a
   // 64-player lobby means each 4-player squad has 60 possible enemies to
   // eliminate; real matches usually land well under that (30-50) since some
   // players die to the zone rather than being finished by an opponent.
@@ -334,6 +389,78 @@ async function main() {
       { placement: 13, kills: 1 },
       { placement: 16, kills: 1 },
       { placement: 15, kills: 0 },
+    ],
+    [
+      { placement: 3, kills: 8 },
+      { placement: 4, kills: 7 },
+      { placement: 1, kills: 10 },
+      { placement: 2, kills: 9 },
+      { placement: 5, kills: 6 },
+      { placement: 6, kills: 5 },
+      { placement: 7, kills: 4 },
+      { placement: 8, kills: 3 },
+      { placement: 10, kills: 1 },
+      { placement: 9, kills: 2 },
+      { placement: 11, kills: 0 },
+      { placement: 12, kills: 0 },
+      { placement: 13, kills: 0 },
+      { placement: 14, kills: 0 },
+      { placement: 16, kills: 0 },
+      { placement: 15, kills: 0 },
+    ],
+    [
+      { placement: 4, kills: 7 },
+      { placement: 3, kills: 8 },
+      { placement: 2, kills: 9 },
+      { placement: 1, kills: 10 },
+      { placement: 6, kills: 5 },
+      { placement: 5, kills: 6 },
+      { placement: 8, kills: 3 },
+      { placement: 7, kills: 4 },
+      { placement: 9, kills: 2 },
+      { placement: 10, kills: 1 },
+      { placement: 12, kills: 0 },
+      { placement: 11, kills: 0 },
+      { placement: 14, kills: 0 },
+      { placement: 13, kills: 0 },
+      { placement: 15, kills: 0 },
+      { placement: 16, kills: 0 },
+    ],
+    [
+      { placement: 1, kills: 10 },
+      { placement: 3, kills: 8 },
+      { placement: 2, kills: 9 },
+      { placement: 4, kills: 7 },
+      { placement: 7, kills: 4 },
+      { placement: 5, kills: 6 },
+      { placement: 6, kills: 5 },
+      { placement: 8, kills: 3 },
+      { placement: 11, kills: 0 },
+      { placement: 9, kills: 2 },
+      { placement: 10, kills: 1 },
+      { placement: 12, kills: 0 },
+      { placement: 15, kills: 0 },
+      { placement: 13, kills: 0 },
+      { placement: 14, kills: 0 },
+      { placement: 16, kills: 0 },
+    ],
+    [
+      { placement: 2, kills: 9 },
+      { placement: 1, kills: 10 },
+      { placement: 4, kills: 7 },
+      { placement: 3, kills: 8 },
+      { placement: 5, kills: 6 },
+      { placement: 7, kills: 4 },
+      { placement: 6, kills: 5 },
+      { placement: 8, kills: 3 },
+      { placement: 9, kills: 2 },
+      { placement: 11, kills: 0 },
+      { placement: 10, kills: 1 },
+      { placement: 12, kills: 0 },
+      { placement: 13, kills: 0 },
+      { placement: 15, kills: 0 },
+      { placement: 14, kills: 0 },
+      { placement: 16, kills: 0 },
     ],
   ];
 
@@ -447,7 +574,7 @@ async function main() {
   });
 
   await prisma.tournamentTeam.createMany({
-    data: brTeams.slice(4, 12).map((team) => ({
+    data: [...brTeams.slice(4, 12), ...additionalBrTeams.slice(0, 4)].map((team) => ({
       tournamentId: brTournamentUpcoming.id,
       teamId: team.id,
     })),
@@ -591,7 +718,7 @@ async function main() {
 
   console.log("Seed complete:", {
     games: 2,
-    brTeams: brTeams.length,
+    brTeams: brTeams.length + additionalBrTeams.length,
     h2hTeams: 2,
     tournaments: 4,
     users: 2,

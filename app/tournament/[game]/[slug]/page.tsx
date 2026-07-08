@@ -1,639 +1,240 @@
-import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { aggregateBRStandings, type BRStandingsRow } from "@/lib/br-standings";
-import { formatDateRange, formatINR, formatUSD } from "@/lib/format";
+import { notFound } from "next/navigation";
+import { getTournamentBySlug, stageStatus } from "@/lib/tournament-data";
+import { formatDateRange, formatINR } from "@/lib/format";
+import { SITE_URL, buildBreadcrumbJsonLd, buildSportsEventJsonLd, jsonLdGraph } from "@/lib/seo";
 import { TeamAvatar } from "@/components/team-avatar";
 import { TournamentCalendar } from "@/components/tournament-calendar";
 import { StageRoadmapTimeline } from "@/components/stage-roadmap-timeline";
 
 export const revalidate = 60;
 
-const statusStyles: Record<string, string> = {
-  ONGOING: "bg-blue-600 text-white",
-  UPCOMING: "bg-blue-50 text-blue-700 border border-blue-200",
-  COMPLETED: "bg-zinc-100 text-zinc-500 border border-zinc-200",
-};
-
-type TabKey = "overview" | "league" | "finals" | "stats";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "league", label: "League" },
-  { key: "finals", label: "Grand Finals" },
-  { key: "stats", label: "Stats" },
-];
-
-function formatMatchTime(scheduledAt: Date | null) {
-  if (!scheduledAt) return "TBA";
-  return scheduledAt.toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-// Stages carry their own admin-set dates (independent of individual match
-// schedules) so the calendar can show a round's window before any matches
-// are entered — derive a status from "today" vs that window.
-function stageStatus(stage: { startDate: Date | null; endDate: Date | null }) {
-  if (!stage.startDate || !stage.endDate) return "TBA";
-  const now = new Date();
-  if (now < stage.startDate) return "UPCOMING";
-  if (now > stage.endDate) return "COMPLETED";
-  return "ONGOING";
-}
-
-function StandingsTable({ rows }: { rows: BRStandingsRow[] }) {
-  if (rows.length === 0) {
-    return <p className="text-sm text-zinc-400">No matches played yet.</p>;
-  }
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-zinc-100 bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead className="border-b border-zinc-100 bg-blue-50/50 text-left text-xs font-semibold uppercase text-zinc-500">
-          <tr>
-            <th className="px-4 py-3">#</th>
-            <th className="px-4 py-3">Team</th>
-            <th className="px-4 py-3 text-right">Matches</th>
-            <th className="px-4 py-3 text-right">WWCD</th>
-            <th className="px-4 py-3 text-right">Kills</th>
-            <th className="px-4 py-3 text-right">Points</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr
-              key={row.teamId}
-              className={`border-b border-zinc-50 last:border-0 ${i < 3 ? "bg-blue-50/30" : ""}`}
-            >
-              <td className="px-4 py-3 font-semibold text-zinc-400">{i + 1}</td>
-              <td className="px-4 py-3 font-medium">{row.teamName}</td>
-              <td className="px-4 py-3 text-right text-zinc-600">{row.matches}</td>
-              <td className="px-4 py-3 text-right text-zinc-600">{row.wwcd}</td>
-              <td className="px-4 py-3 text-right text-zinc-600">{row.kills}</td>
-              <td className="px-4 py-3 text-right font-bold text-blue-700">{row.points}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-export default async function TournamentDetail({
+export async function generateMetadata({
   params,
-  searchParams,
 }: {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string; phase?: string }>;
-}) {
+  params: Promise<{ game: string; slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
-  const { tab: rawTab, phase: rawPhase } = await searchParams;
-  const tab: TabKey = TABS.some((t) => t.key === rawTab)
-    ? (rawTab as TabKey)
-    : "overview";
+  const tournament = await getTournamentBySlug(slug);
+  if (!tournament) return {};
 
-  const tournament = await prisma.tournament.findUnique({
-    where: { slug },
-    include: {
-      game: true,
-      winner: true,
-      runnerUp: true,
-      stages: {
-        orderBy: { order: "asc" },
-        include: {
-          brMatches: {
-            orderBy: { matchNumber: "asc" },
-            include: { entries: { include: { team: true } } },
-          },
-          h2hMatches: {
-            orderBy: { scheduledAt: "asc" },
-            include: {
-              teamA: true,
-              teamB: true,
-              mapScores: { orderBy: { order: "asc" } },
-            },
-          },
-        },
-      },
-      groupStandingsRows: { include: { team: true } },
-      awards: { orderBy: { order: "asc" }, include: { player: true, team: true } },
-      participants: {
-        include: {
-          team: {
-            include: {
-              rosterHistory: {
-                where: { leftAt: null },
-                orderBy: { joinedAt: "asc" },
-                include: { player: true },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
+  const title = `${tournament.name} — Schedule, Standings & Results | EsportsLab`;
+  const description = [
+    tournament.tier,
+    tournament.game.name,
+    formatDateRange(tournament.startDate, tournament.endDate),
+    tournament.prizePool ? `${formatINR(tournament.prizePool)} prize pool` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const url = `${SITE_URL}/tournament/${tournament.game.slug}/${tournament.slug}`;
 
-  if (!tournament) notFound();
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, type: "website" },
+  };
+}
+
+export default async function TournamentOverview({
+  params,
+}: {
+  params: Promise<{ game: string; slug: string }>;
+}) {
+  const { game: gameSlug, slug } = await params;
+  const tournament = await getTournamentBySlug(slug);
+  if (!tournament || tournament.game.slug !== gameSlug) notFound();
 
   const isBR = tournament.game.formatType === "BR";
   const stages = tournament.stages;
-  const finalStage = stages.length > 0 ? stages[stages.length - 1] : null;
-  const leagueStages = finalStage ? stages.slice(0, -1) : [];
 
-  // League has anywhere from a couple of rounds to five-plus (Qualifiers,
-  // Wildcard, Survival Stage, ...), fully admin-named — so default to
-  // whichever phase is actually live, falling back to the most recent one,
-  // rather than always landing on phase 1.
-  const activePhaseId = (() => {
-    if (leagueStages.some((s) => s.id === rawPhase)) return rawPhase as string;
-    const ongoing = leagueStages.find((s) => stageStatus(s) === "ONGOING");
-    if (ongoing) return ongoing.id;
-    const upcoming = leagueStages.find((s) => stageStatus(s) === "UPCOMING");
-    if (upcoming) return upcoming.id;
-    return leagueStages[leagueStages.length - 1]?.id;
-  })();
-  const activeLeagueStage = leagueStages.find((s) => s.id === activePhaseId) ?? null;
-
-  const groupedStandings = new Map<string, typeof tournament.groupStandingsRows>();
-  for (const row of tournament.groupStandingsRows) {
-    const list = groupedStandings.get(row.groupName) ?? [];
-    list.push(row);
-    groupedStandings.set(row.groupName, list);
-  }
-
-  function renderStageSection(stage: (typeof stages)[number]) {
-    const standings = isBR
-      ? aggregateBRStandings(stage.brMatches.flatMap((m) => m.entries))
-      : [];
-
-    return (
-      <div key={stage.id} className="space-y-4">
-        <h3 className="text-sm font-semibold text-zinc-700">{stage.name}</h3>
-
-        {isBR ? (
-          <StandingsTable rows={standings} />
-        ) : groupedStandings.size === 0 ? (
-          <p className="text-sm text-zinc-400">No standings yet.</p>
-        ) : (
-          <div className="space-y-4">
-            {[...groupedStandings.entries()].map(([groupName, rows]) => (
-              <div key={groupName}>
-                <h4 className="mb-2 text-xs font-semibold text-zinc-500">
-                  Group {groupName}
-                </h4>
-                <div className="overflow-x-auto rounded-2xl border border-zinc-100 bg-white shadow-sm">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-zinc-100 bg-blue-50/50 text-left text-xs font-semibold uppercase text-zinc-500">
-                      <tr>
-                        <th className="px-4 py-3">#</th>
-                        <th className="px-4 py-3">Team</th>
-                        <th className="px-4 py-3 text-right">W</th>
-                        <th className="px-4 py-3 text-right">L</th>
-                        <th className="px-4 py-3 text-right">Map Diff</th>
-                        <th className="px-4 py-3 text-right">Round Diff</th>
-                        <th className="px-4 py-3 text-right">Points</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows
-                        .slice()
-                        .sort(
-                          (a, b) =>
-                            b.wins - a.wins ||
-                            b.mapDiff - a.mapDiff ||
-                            b.roundDiff - a.roundDiff,
-                        )
-                        .map((row, i) => (
-                          <tr key={row.id} className="border-b border-zinc-50 last:border-0">
-                            <td className="px-4 py-3 font-semibold text-zinc-400">{i + 1}</td>
-                            <td className="px-4 py-3 font-medium">{row.team.name}</td>
-                            <td className="px-4 py-3 text-right text-zinc-600">{row.wins}</td>
-                            <td className="px-4 py-3 text-right text-zinc-600">{row.losses}</td>
-                            <td className="px-4 py-3 text-right text-zinc-600">
-                              {row.mapDiff > 0 ? `+${row.mapDiff}` : row.mapDiff}
-                            </td>
-                            <td className="px-4 py-3 text-right text-zinc-600">
-                              {row.roundDiff > 0 ? `+${row.roundDiff}` : row.roundDiff}
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold text-blue-700">
-                              {row.points}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {isBR ? (
-          <ul className="space-y-2">
-            {stage.brMatches.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center justify-between rounded-xl border border-zinc-100 bg-white px-4 py-3 text-sm shadow-sm"
-              >
-                <span className="font-medium">
-                  Match {m.matchNumber} · {m.mapName}
-                </span>
-                <span className="text-zinc-400">{formatMatchTime(m.scheduledAt)}</span>
-              </li>
-            ))}
-            {stage.brMatches.length === 0 && (
-              <p className="text-sm text-zinc-400">No matches in this round yet.</p>
-            )}
-          </ul>
-        ) : (
-          <ul className="space-y-2">
-            {stage.h2hMatches.map((m) => (
-              <li
-                key={m.id}
-                className="rounded-xl border border-zinc-100 bg-white px-4 py-3 text-sm shadow-sm"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium">
-                    {m.teamA.name} vs {m.teamB.name} (Bo{m.bestOf})
-                  </span>
-                  <span className="text-zinc-400">{formatMatchTime(m.scheduledAt)}</span>
-                </div>
-                {m.mapScores.length > 0 && (
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {m.mapScores
-                      .map((ms) => `${ms.mapName} ${ms.scoreA}-${ms.scoreB}`)
-                      .join(" · ")}
-                  </p>
-                )}
-              </li>
-            ))}
-            {stage.h2hMatches.length === 0 && (
-              <p className="text-sm text-zinc-400">No matches in this round yet.</p>
-            )}
-          </ul>
-        )}
-      </div>
-    );
-  }
+  const url = `${SITE_URL}/tournament/${tournament.game.slug}/${tournament.slug}`;
+  const jsonLd = jsonLdGraph(
+    buildSportsEventJsonLd({
+      name: tournament.name,
+      url,
+      startDate: tournament.startDate,
+      endDate: tournament.endDate,
+      region: tournament.region,
+      organizer: tournament.organizer,
+      status: tournament.status,
+      imageUrl: tournament.game.logoUrl,
+    }),
+    buildBreadcrumbJsonLd([
+      { name: "Home", url: SITE_URL },
+      { name: "Tournaments", url: `${SITE_URL}/tournament` },
+      { name: tournament.game.name, url: `${SITE_URL}/tournament/${tournament.game.slug}` },
+      { name: tournament.name, url },
+    ]),
+  );
 
   return (
-    <div className="flex flex-1 flex-col text-zinc-900">
-      <section className="relative border-b border-zinc-100">
-        <div className="relative mx-auto max-w-5xl px-6 pt-12 pb-6">
-          <Link
-            href={`/${tournament.game.slug}`}
-            className="text-sm font-medium text-blue-700 hover:underline"
-          >
-            ← {tournament.game.name}
-          </Link>
+    <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
 
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[tournament.status]}`}
-            >
-              {tournament.status}
-            </span>
-            {tournament.tier && (
-              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-500">
-                {tournament.tier}
-              </span>
-            )}
-          </div>
+      <div className="space-y-10">
+        <section>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+            Format
+          </h2>
+          <StageRoadmapTimeline
+            game={gameSlug}
+            slug={slug}
+            stages={stages.map((stage) => ({
+              id: stage.id,
+              name: stage.name,
+              startDate: stage.startDate,
+              endDate: stage.endDate,
+              status: stageStatus(stage),
+            }))}
+          />
+        </section>
 
-          <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            {tournament.name}
-          </h1>
+        <section>
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+            Calendar
+          </h2>
+          <TournamentCalendar stages={stages} />
+        </section>
 
-          <a
-            href={tournament.sourceLink}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline"
-          >
-            View source ↗
-          </a>
-
-          <nav className="mt-6 flex gap-1 border-b border-zinc-100">
-            {TABS.map((t) => (
-              <Link
-                key={t.key}
-                href={t.key === "overview" ? `/tournament/${slug}` : `/tournament/${slug}?tab=${t.key}`}
-                className={`-mb-px rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium ${
-                  tab === t.key
-                    ? "border-blue-600 text-blue-700"
-                    : "border-transparent text-zinc-500 hover:text-zinc-700"
-                }`}
-              >
-                {t.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </section>
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
-        {tab === "overview" && (
-          <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
-            <div className="space-y-10">
-              <section>
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                  Format
-                </h2>
-                <StageRoadmapTimeline
-                  slug={slug}
-                  stages={stages.map((stage) => ({
-                    id: stage.id,
-                    name: stage.name,
-                    startDate: stage.startDate,
-                    endDate: stage.endDate,
-                    status: stageStatus(stage),
-                  }))}
-                />
-              </section>
-
-              <section>
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                  Calendar
-                </h2>
-                <TournamentCalendar stages={stages} />
-              </section>
-
-              {Array.isArray(tournament.prizeBreakdownJson) && tournament.prizeBreakdownJson.length > 0 && (
-                <section>
-                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                    Prize Pool Distribution
-                  </h2>
-                  <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
-                    <table className="w-full text-sm">
-                      <thead className="border-b border-zinc-100 bg-blue-50/50 text-left text-xs font-semibold uppercase text-zinc-500">
-                        <tr>
-                          <th className="px-4 py-3">Placement</th>
-                          <th className="px-4 py-3 text-right">Prize</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(tournament.prizeBreakdownJson as { rank: string; amountInr: number }[]).map((row) => (
-                          <tr key={row.rank} className="border-b border-zinc-50 last:border-0">
-                            <td className="px-4 py-3 font-medium">{row.rank}</td>
-                            <td className="px-4 py-3 text-right font-bold text-blue-700">
-                              {formatINR(row.amountInr)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              )}
-
-              {tournament.awards.length > 0 && (
-                <section>
-                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                    Special Awards
-                  </h2>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {tournament.awards.map((award) => {
-                      const name = award.player?.name ?? award.team?.name ?? "TBA";
-                      const logoUrl = award.player ? null : (award.team?.logoUrl ?? null);
-                      return (
-                        <div
-                          key={award.id}
-                          className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm"
-                        >
-                          <TeamAvatar name={name} logoUrl={logoUrl} size={40} />
-                          <div>
-                            <p className="text-xs font-bold tracking-wide text-cyan-600 uppercase">
-                              {award.category}
-                            </p>
-                            <p className="font-semibold text-blue-900">{name}</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
+        {Array.isArray(tournament.prizeBreakdownJson) && tournament.prizeBreakdownJson.length > 0 && (
+          <section>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+              Prize Pool Distribution
+            </h2>
+            <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+              <table className="w-full text-sm">
+                <thead className="border-b border-zinc-100 bg-blue-50/50 text-left text-xs font-semibold uppercase text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3">Placement</th>
+                    <th className="px-4 py-3 text-right">Prize</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(tournament.prizeBreakdownJson as { rank: string; amountInr: number }[]).map((row) => (
+                    <tr key={row.rank} className="border-b border-zinc-50 last:border-0">
+                      <td className="px-4 py-3 font-medium">{row.rank}</td>
+                      <td className="px-4 py-3 text-right font-bold text-blue-700">
+                        {formatINR(row.amountInr)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-
-            <section className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
-              <div className="h-16 bg-gradient-to-r from-blue-600 to-cyan-500" />
-              <div className="px-5 pb-5">
-                <div className="-mt-8 mb-4 flex items-end gap-3">
-                  <div className="rounded-full border-4 border-white shadow-md">
-                    <TeamAvatar name={tournament.name} logoUrl={tournament.game.logoUrl} size={56} />
-                  </div>
-                  <div className="pb-1">
-                    <p className="font-semibold leading-tight">{tournament.name}</p>
-                    <p className="text-xs text-zinc-400">{tournament.game.name}</p>
-                  </div>
-                </div>
-
-                <dl className="space-y-3 text-sm">
-                  {tournament.tier && (
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="flex items-center gap-1.5 text-zinc-400">
-                        <span aria-hidden>🏷️</span> Event Tier
-                      </dt>
-                      <dd className="font-medium">{tournament.tier}</dd>
-                    </div>
-                  )}
-                  {tournament.eventType && (
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="flex items-center gap-1.5 text-zinc-400">
-                        <span aria-hidden>🖥️</span> Type
-                      </dt>
-                      <dd className="font-medium">{tournament.eventType}</dd>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="flex items-center gap-1.5 text-zinc-400">
-                      <span aria-hidden>🎮</span> Mode
-                    </dt>
-                    <dd className="font-medium">{isBR ? "Squads TPP" : "5v5"}</dd>
-                  </div>
-                  {tournament.region && (
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="flex items-center gap-1.5 text-zinc-400">
-                        <span aria-hidden>📍</span> Location
-                      </dt>
-                      <dd className="font-medium">{tournament.region}</dd>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="flex items-center gap-1.5 text-zinc-400">
-                      <span aria-hidden>💰</span> Total Prize Pool
-                    </dt>
-                    <dd className="text-right font-medium">
-                      {tournament.prizePool ? formatINR(tournament.prizePool) : "TBA"}
-                      {tournament.prizePoolUsd && (
-                        <span className="block text-xs font-normal text-zinc-400">
-                          ({formatUSD(tournament.prizePoolUsd)})
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                  {tournament.series && (
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="flex items-center gap-1.5 text-zinc-400">
-                        <span aria-hidden>🧩</span> Series
-                      </dt>
-                      <dd className="font-medium">{tournament.series}</dd>
-                    </div>
-                  )}
-                  {tournament.season && (
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="flex items-center gap-1.5 text-zinc-400">
-                        <span aria-hidden>🗓️</span> Season
-                      </dt>
-                      <dd className="font-medium">{tournament.season}</dd>
-                    </div>
-                  )}
-                  {tournament.organizer && (
-                    <div className="flex items-center justify-between gap-4">
-                      <dt className="flex items-center gap-1.5 text-zinc-400">
-                        <span aria-hidden>🏢</span> Organizer
-                      </dt>
-                      <dd className="font-medium">{tournament.organizer}</dd>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="flex items-center gap-1.5 text-zinc-400">
-                      <span aria-hidden>📅</span> Dates
-                    </dt>
-                    <dd className="font-medium">
-                      {formatDateRange(tournament.startDate, tournament.endDate)}
-                    </dd>
-                  </div>
-
-                  {tournament.status === "COMPLETED" && (
-                    <>
-                      <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
-                        <dt className="text-zinc-400">Winner</dt>
-                        <dd className="flex items-center gap-2 font-semibold text-amber-700">
-                          {tournament.winner ? (
-                            <>
-                              <span aria-hidden>🏆</span>
-                              {tournament.winner.name}
-                            </>
-                          ) : (
-                            "TBA"
-                          )}
-                        </dd>
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <dt className="text-zinc-400">Runner Up</dt>
-                        <dd className="font-medium">{tournament.runnerUp?.name ?? "TBA"}</dd>
-                      </div>
-                    </>
-                  )}
-                </dl>
-              </div>
-            </section>
-          </div>
+          </section>
         )}
 
-        {tab === "league" && (
-          <div className="space-y-8">
-            {leagueStages.length === 0 ? (
-              <p className="text-sm text-zinc-400">
-                No league rounds — this tournament goes straight to Grand Finals.
-              </p>
-            ) : (
+        {tournament.awards.length > 0 && (
+          <section>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+              Special Awards
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {tournament.awards.map((award) => {
+                const name = award.player?.name ?? award.team?.name ?? "TBA";
+                const logoUrl = award.player ? null : (award.team?.logoUrl ?? null);
+                return (
+                  <div
+                    key={award.id}
+                    className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm"
+                  >
+                    <TeamAvatar name={name} logoUrl={logoUrl} size={40} />
+                    <div>
+                      <p className="text-xs font-bold tracking-wide text-cyan-600 uppercase">
+                        {award.category}
+                      </p>
+                      <p className="font-semibold text-blue-900">{name}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
+
+      <section className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+        <div className="h-16 bg-gradient-to-r from-blue-600 to-cyan-500" />
+        <div className="px-5 pb-5">
+          <div className="-mt-8 mb-4 flex items-end gap-3">
+            <div className="rounded-full border-4 border-white shadow-md">
+              <TeamAvatar name={tournament.name} logoUrl={tournament.game.logoUrl} size={56} />
+            </div>
+            <div className="pb-1">
+              <p className="font-semibold leading-tight">{tournament.name}</p>
+              <p className="text-xs text-zinc-400">{tournament.game.name}</p>
+            </div>
+          </div>
+
+          <dl className="space-y-3 text-sm">
+            {tournament.eventType && (
+              <div className="flex items-center justify-between gap-4">
+                <dt className="flex items-center gap-1.5 text-zinc-400">
+                  <span aria-hidden>🖥️</span> Type
+                </dt>
+                <dd className="font-medium">{tournament.eventType}</dd>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-4">
+              <dt className="flex items-center gap-1.5 text-zinc-400">
+                <span aria-hidden>🎮</span> Mode
+              </dt>
+              <dd className="font-medium">{isBR ? "Squads TPP" : "5v5"}</dd>
+            </div>
+            {tournament.series && (
+              <div className="flex items-center justify-between gap-4">
+                <dt className="flex items-center gap-1.5 text-zinc-400">
+                  <span aria-hidden>🧩</span> Series
+                </dt>
+                <dd className="font-medium">{tournament.series}</dd>
+              </div>
+            )}
+            {tournament.season && (
+              <div className="flex items-center justify-between gap-4">
+                <dt className="flex items-center gap-1.5 text-zinc-400">
+                  <span aria-hidden>🗓️</span> Season
+                </dt>
+                <dd className="font-medium">{tournament.season}</dd>
+              </div>
+            )}
+
+            {tournament.status === "COMPLETED" && (
               <>
-                <nav className="flex flex-wrap gap-2">
-                  {leagueStages.map((stage) => {
-                    const st = stageStatus(stage);
-                    const active = stage.id === activePhaseId;
-                    return (
-                      <Link
-                        key={stage.id}
-                        href={`/tournament/${slug}?tab=league&phase=${stage.id}`}
-                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                          active
-                            ? "bg-blue-600 text-white"
-                            : "border border-zinc-200 text-zinc-500 hover:border-blue-300 hover:text-blue-700"
-                        }`}
-                      >
-                        {stage.name}
-                        {st === "ONGOING" && (
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-                              active ? "bg-white/20 text-white" : "bg-blue-600 text-white"
-                            }`}
-                          >
-                            LIVE
-                          </span>
-                        )}
+                <div className="flex items-center justify-between gap-4 border-t border-zinc-100 pt-3">
+                  <dt className="text-zinc-400">Winner</dt>
+                  <dd className="flex items-center gap-2 font-semibold text-amber-700">
+                    {tournament.winner ? (
+                      <>
+                        <span aria-hidden>🏆</span>
+                        <Link href={`/team/${tournament.winner.slug}`} className="hover:underline">
+                          {tournament.winner.name}
+                        </Link>
+                      </>
+                    ) : (
+                      "TBA"
+                    )}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-zinc-400">Runner Up</dt>
+                  <dd className="font-medium">
+                    {tournament.runnerUp ? (
+                      <Link href={`/team/${tournament.runnerUp.slug}`} className="hover:text-blue-700 hover:underline">
+                        {tournament.runnerUp.name}
                       </Link>
-                    );
-                  })}
-                </nav>
-                {activeLeagueStage && renderStageSection(activeLeagueStage)}
+                    ) : (
+                      "TBA"
+                    )}
+                  </dd>
+                </div>
               </>
             )}
-          </div>
-        )}
-
-        {tab === "finals" && (
-          <div className="space-y-10">
-            {finalStage ? (
-              renderStageSection(finalStage)
-            ) : (
-              <p className="text-sm text-zinc-400">Grand Finals not scheduled yet.</p>
-            )}
-
-            {tournament.participants.length > 0 && (
-              <section>
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
-                  Team Rosters
-                </h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {tournament.participants.map((participant) => {
-                    const { team } = participant;
-                    const coach = team.rosterHistory.find((r) => r.role === "Coach");
-                    const players = team.rosterHistory.filter((r) => r.role !== "Coach");
-                    return (
-                      <div
-                        key={participant.id}
-                        className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm"
-                      >
-                        <div className="mb-3 flex items-center gap-3">
-                          <TeamAvatar name={team.name} logoUrl={team.logoUrl} size={40} />
-                          <p className="font-semibold">{team.name}</p>
-                        </div>
-                        {players.length === 0 ? (
-                          <p className="text-sm text-zinc-400">Roster TBA.</p>
-                        ) : (
-                          <ul className="space-y-1.5 text-sm">
-                            {players.map((r) => (
-                              <li key={r.id} className="flex items-center justify-between gap-3">
-                                <span className="text-zinc-700">{r.player.name}</span>
-                                <span className="text-xs font-medium text-zinc-400">{r.role}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {coach && (
-                          <p className="mt-3 border-t border-zinc-100 pt-2 text-xs text-zinc-400">
-                            Coach <span className="font-medium text-zinc-600">{coach.player.name}</span>
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
-
-        {tab === "stats" && (
-          <p className="text-sm text-zinc-400">
-            Tournament statistics are coming in a later release.
-          </p>
-        )}
-      </main>
+          </dl>
+        </div>
+      </section>
     </div>
   );
 }

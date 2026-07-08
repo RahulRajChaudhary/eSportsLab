@@ -84,9 +84,11 @@ function TrophyIcon() {
 
 export function TournamentRoadmapTimeline({
   year,
+  gameSlug,
   tournaments,
 }: {
   year: number;
+  gameSlug: string;
   tournaments: RoadmapTournament[];
 }) {
   const segmentHeight = 190;
@@ -186,7 +188,7 @@ export function TournamentRoadmapTimeline({
               {tournaments.map((t) => (
                 <motion.div key={t.id} variants={itemVariants}>
                   <Link
-                    href={`/tournament/${t.slug}`}
+                    href={`/tournament/${gameSlug}/${t.slug}`}
                     className="block rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
                   >
                     <div className="mb-2 flex items-center gap-2.5">

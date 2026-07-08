@@ -64,9 +64,11 @@ function StageMarker({ index, isFinal }: { index: number; isFinal: boolean }) {
 }
 
 export function StageRoadmapTimeline({
+  game,
   slug,
   stages,
 }: {
+  game: string;
   slug: string;
   stages: RoadmapStage[];
 }) {
@@ -139,7 +141,7 @@ export function StageRoadmapTimeline({
             return (
               <motion.div key={stage.id} variants={itemVariants}>
                 <Link
-                  href={`/tournament/${slug}?tab=${isFinal ? "finals" : "league"}`}
+                  href={`/tournament/${game}/${slug}/${isFinal ? "finals" : "standings"}`}
                   className="block rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
                 >
                   <div className="mb-1.5 flex flex-wrap items-center gap-2.5">

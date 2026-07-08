@@ -54,7 +54,16 @@ export default async function BgmiRankings() {
                 {r.team && (
                   <TeamAvatar name={r.team.name} logoUrl={r.team.logoUrl} />
                 )}
-                <span className="font-medium">{r.team?.name}</span>
+                {r.team ? (
+                  <Link
+                    href={`/team/${r.team.slug}`}
+                    className="font-medium hover:text-blue-700 hover:underline"
+                  >
+                    {r.team.name}
+                  </Link>
+                ) : (
+                  <span className="font-medium">—</span>
+                )}
               </span>
               <span className="text-zinc-500">{r.points} pts</span>
             </li>

@@ -18,7 +18,7 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav className="flex items-center gap-6 text-sm font-medium text-zinc-600">
-          <Link href="/bgmi" className="transition-colors hover:text-blue-600">
+          <Link href="/tournament" className="transition-colors hover:text-blue-600">
             Tournaments
           </Link>
           <Link href="/bgmi" className="transition-colors hover:text-blue-600">

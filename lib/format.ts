@@ -21,6 +21,27 @@ export function formatINR(amount: number) {
   }).format(amount);
 }
 
+const COUNTRY_NAMES: Record<string, string> = {
+  IN: "🇮🇳 India",
+};
+
+export function formatCountry(code: string | null) {
+  if (!code) return null;
+  return COUNTRY_NAMES[code] ?? code;
+}
+
+// Compact Indian numbering (K/L/Cr) for stat tiles — en-IN's "compact"
+// notation groups this way natively, unlike the $M/$B grouping formatINR's
+// full Intl.NumberFormat would otherwise imply.
+export function formatCompactINR(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
 export function formatUSD(amount: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

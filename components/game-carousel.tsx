@@ -1,50 +1,9 @@
 import Link from "next/link";
+import { GAMES_CATALOG, type GameCatalogEntry } from "@/lib/games-catalog";
 
-type CarouselGame = {
-  slug: string;
-  name: string;
-  tag: string;
-  image: string;
-  live: boolean;
-};
+type CarouselGame = Pick<GameCatalogEntry, "slug" | "name" | "tag" | "image" | "live">;
 
-const GAMES: CarouselGame[] = [
-  {
-    slug: "bgmi",
-    name: "BGMI",
-    tag: "Battle Royale",
-    image: "/games/bgmi.jpg",
-    live: true,
-  },
-  {
-    slug: "valorant",
-    name: "Valorant",
-    tag: "Tactical FPS",
-    image: "/games/valorant.webp",
-    live: false,
-  },
-  {
-    slug: "free-fire",
-    name: "Free Fire",
-    tag: "Battle Royale",
-    image: "/games/free-fire.jpg",
-    live: false,
-  },
-  {
-    slug: "mlbb",
-    name: "Mobile Legends",
-    tag: "MOBA · 5v5",
-    image: "/games/mlbb.png",
-    live: false,
-  },
-  {
-    slug: "pokemon-unite",
-    name: "Pokémon Unite",
-    tag: "MOBA",
-    image: "/games/pokemon-unite.jpg",
-    live: false,
-  },
-];
+const GAMES: CarouselGame[] = GAMES_CATALOG;
 
 // One half of the track; it is rendered twice and the CSS animation slides by
 // exactly -50%, so the loop point is invisible. Three repeats keep a single

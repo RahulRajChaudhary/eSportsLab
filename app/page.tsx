@@ -183,7 +183,7 @@ export default async function Home() {
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Link
-                      href={`/tournament/${spotlight.slug}`}
+                      href={`/tournament/bgmi/${spotlight.slug}`}
                       className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                     >
                       Full standings →

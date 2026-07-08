@@ -56,27 +56,39 @@ Non-features that ARE the product at launch:
 
 ## Milestones (each ends in a demoable state)
 
-### M1 — Public read experience (both games)
-The site works end-to-end for a visitor, with founder-entered data.
-- Tournament list + detail pages (`/tournament/[slug]`), branching BR/H2H layout
-- Match detail pages (`/match/[id]`), BR and H2H variants
-- Team + player pages (shared across games)
-- `/valorant` hub (mirror of `/bgmi` with H2H standings)
+**Reordered (2026-07-08): BGMI is built to completion — including admin/backend —
+before Valorant or community contribution work starts.** One game done like a
+real product beats two games half-done. Valorant read-only support is pushed
+to after M3 (see below); revisit at that point whether it's still worth doing
+before M4 or folded into M4.
+
+### M1 — BGMI public read experience
+The site works end-to-end for a visitor, BGMI only, with founder-entered data.
+- Tournament list page (`/tournament`) + detail pages (`/tournament/[slug]`)
+- Match detail pages (`/match/[id]`), BR variant
+- Team + player pages (built shared, but only exercised by BGMI data for now)
 - Empty states, 404s, loading states on everything
 
-### M2 — Admin can run the site
+### M2 — Admin can run the BGMI site
 We can operate the product daily without touching the DB.
 - Auth (Auth.js — Google OAuth) with USER/EDITOR/ADMIN roles
-- `/admin`: create/edit tournaments, teams, players, enter results
+- `/admin`: create/edit tournaments, teams, players, enter BR match results
 - CSV paste for BR standings (papaparse → preview → confirm)
 - On-demand `revalidatePath()` after every admin write
 
-### M3 — Community can contribute
+### M3 — Community can contribute (BGMI)
 The wiki loop opens.
 - Public submission forms (result / team / correction) → `Revision` rows
 - `source_link` required, enforced in form + API
 - Pending review queue in `/admin` with approve/reject
 - Recent Changes page (public feed of approved edits)
+
+### M3.5 — Valorant read-only hub
+Now that the BGMI loop (data in → verified → published) is proven end to end,
+add the second title.
+- `/valorant` hub (mirror of `/bgmi` with H2H standings)
+- H2H match detail pages, group standings
+- Same Revision pipeline extended to Valorant submissions
 
 ### M4 — The differentiator + launch polish
 - Points Table Maker (Konva.js): auto-filled from tournament data, recolor,
@@ -87,7 +99,7 @@ The wiki loop opens.
 - Deploy to production (Cloudflare Pages + Neon), domain, uptime monitoring
 
 **Launch = end of M4.** Each milestone is also a usable checkpoint — if timelines
-slip, M1-M3 alone is a functioning (if quieter) product.
+slip, M1-M3 (BGMI-only) alone is a functioning (if single-game) product.
 
 ---
 
@@ -103,10 +115,17 @@ core undeniably solid.
 
 ---
 
-## Current status (as of this writing)
+## Current status (as of 2026-07-08)
 
 - ✅ Schema (dual match system), migrations, seed data — both games
 - ✅ Landing page (EL brand, light theme, carousel, search UI stub)
 - ✅ `/bgmi` hub with live standings
 - ✅ Shared header/footer components
-- ⬜ Everything in M1 beyond the hubs — next up: tournament detail pages
+- ✅ Tournament detail page (`/tournament/[slug]`) — overview/league/finals/stats tabs
+- ✅ Team detail page (`/team/[slug]`), Player detail page (`/player/[slug]`)
+- ⬜ Tournament list page (`/tournament`) — not started
+- ⬜ Match detail pages (`/match/[id]`) — not started
+- ⬜ Dedicated `loading.tsx` / `not-found.tsx` — only inline empty states so far
+- ⬜ M2 admin/auth/backend — not started
+- ⬜ M3 community contribution — not started
+- ⬜ Valorant hub — deferred until after M3 per reordering above
