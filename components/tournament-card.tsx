@@ -23,6 +23,7 @@ export type TournamentCardData = {
   startDate: Date | null;
   endDate: Date | null;
   prizePool: number | null;
+  logoUrl: string | null;
   game: { slug: string; name: string; logoUrl: string | null };
   participantCount: number;
 };
@@ -111,7 +112,7 @@ export function TournamentCard({ tournament, now }: { tournament: TournamentCard
       <span className={`absolute top-0 left-0 h-full w-1 ${ACCENT_BAR[tournament.status]}`} aria-hidden />
 
       <div className="flex flex-wrap items-center gap-4 py-4 pr-4">
-        <TeamAvatar name={tournament.game.name} logoUrl={tournament.game.logoUrl} size={40} />
+        <TeamAvatar name={tournament.game.name} logoUrl={tournament.logoUrl ?? tournament.game.logoUrl} size={40} />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

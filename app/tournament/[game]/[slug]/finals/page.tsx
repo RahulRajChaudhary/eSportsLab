@@ -71,6 +71,7 @@ export default async function TournamentFinals({
           isBR={isBR}
           pointsPerKill={pointsPerKill}
           groupedStandings={groupedStandings}
+          showTeamLogos={tournament.showTeamLogos}
         />
       ) : (
         <p className="text-sm text-zinc-400">Grand Finals not scheduled yet.</p>
@@ -89,7 +90,7 @@ export default async function TournamentFinals({
               return (
                 <div key={participant.id} className="rounded-2xl border border-zinc-100 bg-white p-4 shadow-sm">
                   <Link href={`/team/${team.slug}`} className="mb-3 flex items-center gap-3">
-                    <TeamAvatar name={team.name} logoUrl={team.logoUrl} size={40} />
+                    <TeamAvatar name={team.name} logoUrl={tournament.showTeamLogos ? team.logoUrl : null} size={40} />
                     <p className="font-semibold hover:text-blue-700 hover:underline">{team.name}</p>
                   </Link>
                   {players.length === 0 ? (
@@ -98,7 +99,11 @@ export default async function TournamentFinals({
                     <ul className="space-y-1.5 text-sm">
                       {players.map((r) => (
                         <li key={r.id} className="flex items-center justify-between gap-3">
-                          <Link href={`/player/${r.player.slug}`} className="text-zinc-700 hover:text-blue-700 hover:underline">
+                          <Link
+                            href={`/player/${r.player.slug}`}
+                            className="flex items-center gap-2 text-zinc-700 hover:text-blue-700 hover:underline"
+                          >
+                            <TeamAvatar name={r.player.name} logoUrl={r.player.imageUrl} size={24} />
                             {r.player.name}
                           </Link>
                           <span className="text-xs font-medium text-zinc-400">{r.role}</span>

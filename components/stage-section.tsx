@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { buildMatchWiseStandings } from "@/lib/br-standings";
 import { MatchWiseStandingsTable } from "@/components/match-wise-standings-table";
+import { StageDescriptionDisclosure } from "@/components/stage-description-disclosure";
 import type { TournamentWithDetails } from "@/lib/tournament-data";
 
 type Stage = TournamentWithDetails["stages"][number];
@@ -19,20 +20,26 @@ export function StageSection({
   isBR,
   pointsPerKill,
   groupedStandings,
+  showTeamLogos,
 }: {
   stage: Stage;
   isBR: boolean;
   pointsPerKill: number;
   groupedStandings: Map<string, GroupStandingsRow[]>;
+  showTeamLogos: boolean;
 }) {
   const matchWise = isBR ? buildMatchWiseStandings(stage.brMatches, pointsPerKill) : null;
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-zinc-700">{stage.name}</h3>
+      {stage.description ? (
+        <StageDescriptionDisclosure name={stage.name} html={stage.description} />
+      ) : (
+        <h3 className="text-sm font-semibold text-zinc-700">{stage.name}</h3>
+      )}
 
       {matchWise ? (
-        <MatchWiseStandingsTable matches={matchWise.matches} rows={matchWise.rows} />
+        <MatchWiseStandingsTable matches={matchWise.matches} rows={matchWise.rows} showTeamLogos={showTeamLogos} />
       ) : groupedStandings.size === 0 ? (
         <p className="text-sm text-zinc-400">No standings yet.</p>
       ) : (

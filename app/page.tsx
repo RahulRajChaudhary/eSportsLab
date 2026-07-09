@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getBRStandings } from "@/lib/br-standings";
 import { formatDateRange } from "@/lib/format";
 import { GameCarousel } from "@/components/game-carousel";
+import { ContributeModal } from "@/components/contribute-modal";
 
 // Regenerate every 60s — most traffic should hit this cached HTML, not the DB.
 export const revalidate = 60;
@@ -144,6 +145,7 @@ export default async function Home() {
               >
                 How verification works
               </a>
+              <ContributeModal />
             </div>
           </div>
         </section>

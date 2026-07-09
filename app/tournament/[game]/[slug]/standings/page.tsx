@@ -121,6 +121,7 @@ export default async function TournamentStandings({
               isBR={isBR}
               pointsPerKill={pointsPerKill}
               groupedStandings={groupedStandings}
+              showTeamLogos={tournament.showTeamLogos}
             />
           )}
         </>

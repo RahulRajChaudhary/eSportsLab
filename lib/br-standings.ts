@@ -1,5 +1,18 @@
 import { prisma } from "@/lib/prisma";
 
+// "Compute at entry time, then store" (see BRMatchEntry.pointsEarned in the
+// schema) — this is the one formula every write path (seed data, admin
+// match entry, CSV import) must share so a `PointsSystem` edit later never
+// silently reshapes past results.
+export function computeBRPoints(
+  placementPoints: Record<string, number>,
+  placement: number,
+  kills: number,
+  pointsPerKill: number,
+) {
+  return (placementPoints[String(placement)] ?? 0) + kills * pointsPerKill;
+}
+
 export type BRStandingsRow = {
   teamId: string;
   teamName: string;
@@ -12,7 +25,7 @@ export type BRStandingsRow = {
 
 export type BRStandingsEntryInput = {
   teamId: string;
-  team: { name: string; slug: string };
+  team: { name: string; slug: string; logoUrl: string | null };
   placement: number;
   kills: number;
   pointsEarned: number;
@@ -62,6 +75,7 @@ export type MatchWiseRow = {
   teamId: string;
   teamName: string;
   teamSlug: string;
+  teamLogoUrl: string | null;
   matches: number;
   wwcd: number;
   placementPoints: number;
@@ -100,6 +114,7 @@ export function buildMatchWiseStandings(
         teamId: entry.teamId,
         teamName: entry.team.name,
         teamSlug: entry.team.slug,
+        teamLogoUrl: entry.team.logoUrl,
         matches: 0,
         wwcd: 0,
         placementPoints: 0,

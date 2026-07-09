@@ -1,22 +1,11 @@
 import { PrismaClient } from "../app/generated/prisma/client";
+import { computeBRPoints } from "../lib/br-standings";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set — check your .env file");
 }
 
 const prisma = new PrismaClient({ accelerateUrl: process.env.DATABASE_URL });
-
-// Mirrors the "compute at entry time, then store" rule from the schema:
-// PointsSystem defines the rules, but pointsEarned is calculated once here
-// and never recomputed later.
-function computeBRPoints(
-  placementPoints: Record<string, number>,
-  placement: number,
-  kills: number,
-  pointsPerKill: number,
-) {
-  return (placementPoints[String(placement)] ?? 0) + kills * pointsPerKill;
-}
 
 async function main() {
   // Wipe in FK-safe order (children before parents) so the script is

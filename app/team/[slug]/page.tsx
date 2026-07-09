@@ -112,7 +112,7 @@ export default async function TeamDetail({
                       href={`/player/${r.player.slug}`}
                       className="flex items-center gap-3 rounded-xl border border-zinc-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
                     >
-                      <TeamAvatar name={r.player.name} logoUrl={null} size={36} />
+                      <TeamAvatar name={r.player.name} logoUrl={r.player.imageUrl} size={36} />
                       <div>
                         <p className="font-semibold">{r.player.name}</p>
                         <p className="text-xs text-zinc-400">{r.role}</p>
@@ -130,7 +130,7 @@ export default async function TeamDetail({
                       href={`/player/${r.player.slug}`}
                       className="flex items-center gap-3 rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4 shadow-sm transition-shadow hover:shadow-md"
                     >
-                      <TeamAvatar name={r.player.name} logoUrl={null} size={36} />
+                      <TeamAvatar name={r.player.name} logoUrl={r.player.imageUrl} size={36} />
                       <div>
                         <p className="font-semibold">{r.player.name}</p>
                         <p className="text-xs text-zinc-400">Substitute</p>

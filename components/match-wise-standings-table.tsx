@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import type { buildMatchWiseStandings } from "@/lib/br-standings";
+import { TeamAvatar } from "@/components/team-avatar";
 
 // Sticky left block (rank/team/summary totals) plus a horizontally scrolling
 // M1/M2/M3... section — mirrors the standings layout used on Liquipedia and
@@ -28,9 +29,11 @@ function stickyOffset(index: number) {
 export function MatchWiseStandingsTable({
   matches,
   rows,
+  showTeamLogos,
 }: {
   matches: { id: string; matchNumber: number; mapName: string }[];
   rows: ReturnType<typeof buildMatchWiseStandings>["rows"];
+  showTeamLogos: boolean;
 }) {
   if (matches.length === 0) {
     return <p className="text-sm text-zinc-400">No matches in this round yet.</p>;
@@ -108,8 +111,12 @@ export function MatchWiseStandingsTable({
                 style={{ left: stickyOffset(1), width: STICKY_COLS[1].width }}
                 className="sticky z-10 truncate bg-white px-2 py-3 font-medium"
               >
-                <Link href={`/team/${row.teamSlug}`} className="hover:text-blue-700 hover:underline">
-                  {row.teamName}
+                <Link
+                  href={`/team/${row.teamSlug}`}
+                  className="flex items-center gap-2 hover:text-blue-700 hover:underline"
+                >
+                  {showTeamLogos && <TeamAvatar name={row.teamName} logoUrl={row.teamLogoUrl} size={20} />}
+                  <span className="truncate">{row.teamName}</span>
                 </Link>
               </td>
               <td

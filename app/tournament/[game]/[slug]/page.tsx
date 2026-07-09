@@ -161,7 +161,7 @@ export default async function TournamentOverview({
         <div className="px-5 pb-5">
           <div className="-mt-8 mb-4 flex items-end gap-3">
             <div className="rounded-full border-4 border-white shadow-md">
-              <TeamAvatar name={tournament.name} logoUrl={tournament.game.logoUrl} size={56} />
+              <TeamAvatar name={tournament.name} logoUrl={tournament.logoUrl ?? tournament.game.logoUrl} size={56} />
             </div>
             <div className="pb-1">
               <p className="font-semibold leading-tight">{tournament.name}</p>
@@ -209,6 +209,9 @@ export default async function TournamentOverview({
                     {tournament.winner ? (
                       <>
                         <span aria-hidden>🏆</span>
+                        {tournament.showTeamLogos && (
+                          <TeamAvatar name={tournament.winner.name} logoUrl={tournament.winner.logoUrl} size={20} />
+                        )}
                         <Link href={`/team/${tournament.winner.slug}`} className="hover:underline">
                           {tournament.winner.name}
                         </Link>
@@ -220,11 +223,16 @@ export default async function TournamentOverview({
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt className="text-zinc-400">Runner Up</dt>
-                  <dd className="font-medium">
+                  <dd className="flex items-center gap-2 font-medium">
                     {tournament.runnerUp ? (
-                      <Link href={`/team/${tournament.runnerUp.slug}`} className="hover:text-blue-700 hover:underline">
-                        {tournament.runnerUp.name}
-                      </Link>
+                      <>
+                        {tournament.showTeamLogos && (
+                          <TeamAvatar name={tournament.runnerUp.name} logoUrl={tournament.runnerUp.logoUrl} size={20} />
+                        )}
+                        <Link href={`/team/${tournament.runnerUp.slug}`} className="hover:text-blue-700 hover:underline">
+                          {tournament.runnerUp.name}
+                        </Link>
+                      </>
                     ) : (
                       "TBA"
                     )}

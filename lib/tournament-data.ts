@@ -52,6 +52,29 @@ export type TournamentWithDetails = NonNullable<
   Awaited<ReturnType<typeof getTournamentBySlug>>
 >;
 
+// Separate from getTournamentBySlug: admin edit screens key off id (stable
+// across a name/slug edit) and need lighter, admin-shaped includes rather
+// than the public page's full render tree.
+export const getTournamentForAdmin = cache(async (id: string) => {
+  return prisma.tournament.findUnique({
+    where: { id },
+    include: {
+      game: true,
+      pointsSystem: true,
+      stages: {
+        orderBy: { order: "asc" },
+        include: { _count: { select: { brMatches: true, h2hMatches: true } } },
+      },
+      participants: {
+        include: { team: true },
+        orderBy: { team: { name: "asc" } },
+      },
+    },
+  });
+});
+
+export type TournamentForAdmin = NonNullable<Awaited<ReturnType<typeof getTournamentForAdmin>>>;
+
 // Stages carry their own admin-set dates (independent of individual match
 // schedules) so the calendar/format views can show a round's window before
 // any matches are entered — derive a status from "today" vs that window.

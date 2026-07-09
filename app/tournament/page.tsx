@@ -100,6 +100,7 @@ export default async function TournamentIndex({
     startDate: t.startDate,
     endDate: t.endDate,
     prizePool: t.prizePool,
+    logoUrl: t.logoUrl,
     game: { slug: t.game.slug, name: t.game.name, logoUrl: t.game.logoUrl },
     participantCount: t._count.participants,
   });

@@ -65,7 +65,10 @@ before M4 or folded into M4.
 ### M1 — BGMI public read experience
 The site works end-to-end for a visitor, BGMI only, with founder-entered data.
 - Tournament list page (`/tournament`) + detail pages (`/tournament/[slug]`)
-- Match detail pages (`/match/[id]`), BR variant
+- BR match results shown as a match-wise standings table (M1/M2/M3... columns
+  of placement + finish points per team) on the standings/finals tabs, instead
+  of separate `/match/[id]` pages — matches how Liquipedia/esportsamaze present
+  BR results and avoids a per-match page nobody needs to deep-link to
 - Team + player pages (built shared, but only exercised by BGMI data for now)
 - Empty states, 404s, loading states on everything
 
@@ -115,7 +118,7 @@ core undeniably solid.
 
 ---
 
-## Current status (as of 2026-07-08)
+## Current status (as of 2026-07-09)
 
 - ✅ Schema (dual match system), migrations, seed data — both games
 - ✅ Landing page (EL brand, light theme, carousel, search UI stub)
@@ -123,9 +126,17 @@ core undeniably solid.
 - ✅ Shared header/footer components
 - ✅ Tournament detail page (`/tournament/[slug]`) — overview/league/finals/stats tabs
 - ✅ Team detail page (`/team/[slug]`), Player detail page (`/player/[slug]`)
-- ⬜ Tournament list page (`/tournament`) — not started
-- ⬜ Match detail pages (`/match/[id]`) — not started
-- ⬜ Dedicated `loading.tsx` / `not-found.tsx` — only inline empty states so far
-- ⬜ M2 admin/auth/backend — not started
+- ✅ Tournament list page (`/tournament`)
+- ✅ BR match results via match-wise standings table (M1/M2/M3... columns) —
+  replaces the planned `/match/[id]` detail page, see M1 above
+- ✅ Dedicated `loading.tsx` / `not-found.tsx` across bgmi, rankings, tournament
+  list/hub/detail, team, player, and root
+- ✅ M2 admin/auth/backend — Auth.js (Google OAuth, USER/EDITOR/ADMIN roles),
+  ADMIN-only `/admin` CRUD (teams, players, tournaments incl.
+  stages/points-system/participants), BR match entry with a scalable
+  searchable team picker + inline team creation, CSV import, device image
+  uploads (Cloudflare R2), custom per-tournament match stat columns,
+  `revalidatePath()` wired into every write — **code-complete, pending the
+  user's own manual click-through pass and filling in real R2 credentials**
 - ⬜ M3 community contribution — not started
 - ⬜ Valorant hub — deferred until after M3 per reordering above

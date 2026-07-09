@@ -49,7 +49,7 @@ export default async function PlayerDetail({
           </Link>
 
           <div className="mt-4 flex items-center gap-4">
-            <TeamAvatar name={player.name} logoUrl={null} size={64} />
+            <TeamAvatar name={player.name} logoUrl={player.imageUrl} size={64} />
             <div>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{player.name}</h1>
               <p className="mt-1 text-sm text-zinc-500">
