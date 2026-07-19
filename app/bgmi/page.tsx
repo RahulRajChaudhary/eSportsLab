@@ -47,7 +47,13 @@ const statusStyles: Record<string, string> = {
   COMPLETED: "bg-zinc-100 text-zinc-500 border border-zinc-200",
 };
 
-export default async function BgmiHub() {
+const TOURNAMENTS_PER_PAGE = 5;
+
+export default async function BgmiHub({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; page?: string }>;
+}) {
   const game = await prisma.game.findUnique({ where: { slug: "bgmi" } });
   if (!game) notFound();
 
@@ -55,6 +61,31 @@ export default async function BgmiHub() {
     where: { gameId: game.id },
     orderBy: [{ startDate: "desc" }],
   });
+
+  // Grouped by `season` (always set on real tournaments) rather than
+  // startDate's year, since a couple of upcoming 2026 events don't have
+  // dates announced yet but still belong in the 2026 tab.
+  const years = Array.from(new Set(tournaments.map((t) => t.season).filter((s): s is string => !!s))).sort(
+    (a, b) => Number(b) - Number(a),
+  );
+  const { year: rawYear, page: rawPage } = await searchParams;
+  const yearFilter = years.includes(rawYear ?? "") ? (rawYear as string) : "all";
+  const visibleTournaments =
+    yearFilter === "all" ? tournaments : tournaments.filter((t) => t.season === yearFilter);
+
+  const totalPages = Math.max(1, Math.ceil(visibleTournaments.length / TOURNAMENTS_PER_PAGE));
+  const page = Math.min(Math.max(Number(rawPage) || 1, 1), totalPages);
+  const pageTournaments = visibleTournaments.slice(
+    (page - 1) * TOURNAMENTS_PER_PAGE,
+    page * TOURNAMENTS_PER_PAGE,
+  );
+  function buildTournamentsPageUrl(targetPage: number) {
+    const params = new URLSearchParams();
+    if (yearFilter !== "all") params.set("year", yearFilter);
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const qs = params.toString();
+    return `/bgmi${qs ? `?${qs}` : ""}`;
+  }
 
   const featured =
     tournaments.find((t) => t.status === "ONGOING") ?? tournaments[0];
@@ -111,8 +142,26 @@ export default async function BgmiHub() {
               <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">
                 All tournaments
               </h2>
+
+              <div className="mb-5 inline-flex flex-wrap rounded-full border border-zinc-200 bg-zinc-50/60 p-1">
+                {["all", ...years].map((y) => {
+                  const active = y === yearFilter;
+                  return (
+                    <Link
+                      key={y}
+                      href={y === "all" ? "/bgmi" : `/bgmi?year=${y}`}
+                      className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
+                        active ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-800"
+                      }`}
+                    >
+                      {y === "all" ? "All" : y}
+                    </Link>
+                  );
+                })}
+              </div>
+
               <ul className="space-y-3">
-                {tournaments.map((t) => (
+                {pageTournaments.map((t) => (
                   <li key={t.id}>
                     <Link
                       href={`/tournament/${game.slug}/${t.slug}`}
@@ -134,10 +183,50 @@ export default async function BgmiHub() {
                     </Link>
                   </li>
                 ))}
-                {tournaments.length === 0 && (
+                {visibleTournaments.length === 0 && (
                   <p className="text-sm text-zinc-400">No tournaments yet.</p>
                 )}
               </ul>
+
+              {totalPages > 1 && (
+                <div className="mt-5 flex items-center justify-center gap-2">
+                  <Link
+                    href={buildTournamentsPageUrl(page - 1)}
+                    aria-disabled={page <= 1}
+                    className={`rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold ${
+                      page <= 1
+                        ? "pointer-events-none text-zinc-300"
+                        : "text-zinc-600 hover:border-blue-300 hover:text-blue-700"
+                    }`}
+                  >
+                    ← Prev
+                  </Link>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <Link
+                      key={p}
+                      href={buildTournamentsPageUrl(p)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                        p === page
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-zinc-500 hover:bg-zinc-100"
+                      }`}
+                    >
+                      {p}
+                    </Link>
+                  ))}
+                  <Link
+                    href={buildTournamentsPageUrl(page + 1)}
+                    aria-disabled={page >= totalPages}
+                    className={`rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-semibold ${
+                      page >= totalPages
+                        ? "pointer-events-none text-zinc-300"
+                        : "text-zinc-600 hover:border-blue-300 hover:text-blue-700"
+                    }`}
+                  >
+                    Next →
+                  </Link>
+                </div>
+              )}
             </section>
 
             {featured && (

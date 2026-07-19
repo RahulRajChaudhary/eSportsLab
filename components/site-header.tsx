@@ -16,6 +16,9 @@ export function SiteHeader() {
           <span className="text-lg font-bold tracking-tight text-zinc-900">
             Esports<span className="text-blue-600">Lab</span>
           </span>
+          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-600">
+            Beta
+          </span>
         </Link>
         <nav className="flex items-center gap-6 text-sm font-medium text-zinc-600">
           <Link href="/tournament" className="transition-colors hover:text-blue-600">

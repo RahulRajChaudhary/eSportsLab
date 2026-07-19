@@ -42,6 +42,10 @@ export default async function TeamDetail({
 
   if (!team) notFound();
 
+  const rankingSnapshot = await prisma.rankingSnapshot.findFirst({
+    where: { teamId: team.id, gameId: team.gameId },
+  });
+
   const currentRoster = team.rosterHistory.filter(
     (r) => r.leftAt === null && r.role !== "Coach" && r.role !== "Substitute",
   );
@@ -55,6 +59,7 @@ export default async function TeamDetail({
   const runnerUpIds = new Set(team.tournamentsRunnerUp.map((t) => t.id));
 
   const socials = (team.socials as Record<string, string> | null) ?? null;
+  const sponsors = (team.sponsors as Record<string, string> | null) ?? null;
 
   return (
     <div className="flex flex-1 flex-col text-zinc-900">
@@ -70,12 +75,50 @@ export default async function TeamDetail({
           <div className="mt-4 flex items-center gap-4">
             <TeamAvatar name={team.name} logoUrl={team.logoUrl} size={64} />
             <div>
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{team.name}</h1>
+              <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                {team.name}
+                {team.tag && (
+                  <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-sm font-semibold text-zinc-500">
+                    {team.tag}
+                  </span>
+                )}
+              </h1>
               <p className="mt-1 text-sm text-zinc-500">
                 {[team.region, team.game.name].filter(Boolean).join(" · ")}
               </p>
             </div>
+            {rankingSnapshot && (
+              <div className="ml-auto flex flex-col items-center rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">
+                  Krafton Rank
+                </span>
+                <span className="text-xl font-bold text-blue-700">#{rankingSnapshot.rank}</span>
+              </div>
+            )}
           </div>
+
+          {sponsors && Object.keys(sponsors).length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+              <span className="font-semibold uppercase tracking-wide text-zinc-400">Sponsors</span>
+              {Object.entries(sponsors).map(([name, url]) =>
+                url ? (
+                  <a
+                    key={name}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full border border-zinc-200 px-3 py-1 font-medium text-zinc-600 hover:border-blue-300 hover:text-blue-700"
+                  >
+                    {name}
+                  </a>
+                ) : (
+                  <span key={name} className="rounded-full border border-zinc-200 px-3 py-1 font-medium">
+                    {name}
+                  </span>
+                ),
+              )}
+            </div>
+          )}
 
           {socials && Object.keys(socials).length > 0 && (
             <div className="mt-4 flex flex-wrap gap-3">

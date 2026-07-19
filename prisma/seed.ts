@@ -66,13 +66,21 @@ async function main() {
   ];
 
   const brTeams = await Promise.all(
-    brTeamNames.map((name) =>
+    brTeamNames.map((name, i) =>
       prisma.team.create({
         data: {
           slug: name.toLowerCase().replace(/\s+/g, "-"),
           name,
           gameId: bgmi.id,
           region: "India",
+          // Only the top-seeded team gets a tag/sponsors in seed data — enough
+          // to exercise the infobox rendering without hand-authoring all 16.
+          ...(i === 0
+            ? {
+                tag: "CH-ESP",
+                sponsors: { "Red Bull": "https://redbull.com", Logitech: "https://logitechg.com" },
+              }
+            : {}),
         },
       }),
     ),
@@ -82,6 +90,10 @@ async function main() {
   // Indexed by team slug, then role index — used later to hand out
   // TournamentAward rows (MVP, Best IGL, Best Clutch) to specific players.
   const brPlayersByTeam = new Map<string, Awaited<ReturnType<typeof prisma.player.create>>[]>();
+  // Flat list of main-roster players (excludes subs/coaches) — used below to
+  // seed the player-side RankingSnapshot rows, mirroring esportsamaze's
+  // separate team/player leaderboards.
+  const brMainPlayers: Awaited<ReturnType<typeof prisma.player.create>>[] = [];
   for (const [teamIndex, team] of brTeams.entries()) {
     const teamPlayers: Awaited<ReturnType<typeof prisma.player.create>>[] = [];
     for (let i = 0; i < 4; i++) {
@@ -103,6 +115,7 @@ async function main() {
         },
       });
       teamPlayers.push(player);
+      brMainPlayers.push(player);
     }
 
     // Half the lobby carries a 5th, in-game substitute — real BGMI orgs
@@ -664,6 +677,15 @@ async function main() {
       gameId: bgmi.id,
       teamId: team.id,
       points: (brTeams.length - i) * 20,
+      rank: i + 1,
+    })),
+  });
+
+  await prisma.rankingSnapshot.createMany({
+    data: brMainPlayers.map((player, i) => ({
+      gameId: bgmi.id,
+      playerId: player.id,
+      points: (brMainPlayers.length - i) * 5,
       rank: i + 1,
     })),
   });

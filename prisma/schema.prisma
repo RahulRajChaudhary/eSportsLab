@@ -265,7 +265,13 @@ model Team {
   game      Game     @relation(fields: [gameId], references: [id])
   logoUrl   String?
   region    String?
+  // Short in-game tag/abbreviation shown next to the team name in standings
+  // and the infobox (e.g. "IQ-SOUL") — distinct from the full team name.
+  tag       String?
   socials   Json?
+  // Sponsor name -> website URL (URL optional, same shape as `socials`),
+  // rendered as a list of sponsor badges on the team infobox.
+  sponsors  Json?
   createdAt DateTime @default(now())
 
   rosterHistory       RosterHistory[]

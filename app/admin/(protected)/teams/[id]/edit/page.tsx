@@ -52,8 +52,10 @@ export default async function EditTeamPage({ params }: { params: Promise<{ id: s
             slug: team.slug,
             gameId: team.gameId,
             region: team.region,
+            tag: team.tag,
             logoUrl: team.logoUrl,
             socials: (team.socials as Record<string, string> | null) ?? null,
+            sponsors: (team.sponsors as Record<string, string> | null) ?? null,
           }}
         />
       </section>

@@ -23,8 +23,10 @@ export function TeamForm({
     slug: string;
     gameId: string;
     region: string | null;
+    tag: string | null;
     logoUrl: string | null;
     socials: Record<string, string> | null;
+    sponsors: Record<string, string> | null;
   };
   submitLabel?: string;
 }) {
@@ -87,6 +89,19 @@ export function TeamForm({
         />
       </div>
 
+      <div>
+        <label className={labelClass} htmlFor="tag">
+          Team tag
+        </label>
+        <input
+          id="tag"
+          name="tag"
+          defaultValue={defaultValues?.tag ?? ""}
+          placeholder="IQ-SOUL"
+          className={fieldClass}
+        />
+      </div>
+
       <ImageUploadField
         name="logoUrl"
         label="Logo"
@@ -104,6 +119,18 @@ export function TeamForm({
           keyPlaceholder="twitter"
           valuePlaceholder="https://twitter.com/..."
           defaultValue={defaultValues?.socials}
+        />
+      </div>
+
+      <div>
+        <label className={labelClass}>Sponsors</label>
+        <KeyValueRowsInput
+          name="sponsorsJson"
+          keyLabel="Sponsor"
+          valueLabel="URL (optional)"
+          keyPlaceholder="iQOO"
+          valuePlaceholder="https://iqoo.com"
+          defaultValue={defaultValues?.sponsors}
         />
       </div>
 

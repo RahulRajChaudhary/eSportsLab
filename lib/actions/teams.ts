@@ -15,8 +15,10 @@ const teamSchema = z.object({
   slug: z.string().optional(),
   gameId: z.string().min(1, "Game is required"),
   region: z.string().optional(),
+  tag: z.string().optional(),
   logoUrl: z.string().url().optional().or(z.literal("")),
   socialsJson: z.string(),
+  sponsorsJson: z.string(),
 });
 
 export async function createTeam(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -24,7 +26,7 @@ export async function createTeam(_prevState: ActionState, formData: FormData): P
 
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  const { name, gameId, region, logoUrl, socialsJson } = parsed.data;
+  const { name, gameId, region, tag, logoUrl, socialsJson, sponsorsJson } = parsed.data;
 
   const game = await prisma.game.findUnique({ where: { id: gameId } });
   if (!game) return { error: "Unknown game" };
@@ -39,8 +41,10 @@ export async function createTeam(_prevState: ActionState, formData: FormData): P
       slug,
       gameId,
       region: region || null,
+      tag: tag || null,
       logoUrl: logoUrl || null,
       socials: parseKeyValueJson(socialsJson),
+      sponsors: parseKeyValueJson(sponsorsJson),
     },
   });
 
@@ -57,7 +61,7 @@ export async function updateTeam(
 
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  const { name, gameId, region, logoUrl, socialsJson } = parsed.data;
+  const { name, gameId, region, tag, logoUrl, socialsJson, sponsorsJson } = parsed.data;
 
   const existing = await prisma.team.findUnique({ where: { id: teamId } });
   if (!existing) return { error: "Team not found" };
@@ -81,8 +85,10 @@ export async function updateTeam(
       slug,
       gameId,
       region: region || null,
+      tag: tag || null,
       logoUrl: logoUrl || null,
       socials: parseKeyValueJson(socialsJson),
+      sponsors: parseKeyValueJson(sponsorsJson),
     },
   });
 
